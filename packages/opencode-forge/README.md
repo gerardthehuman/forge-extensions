@@ -27,6 +27,10 @@ Or, add to your configuration:
 Saved model catalogs load before network discovery. Both plugins share the cache. Run
 `/forge:refresh` to update Desktop and Router models, pricing, limits, and the shared cache.
 
+## Usage
+
+Run `/forge:usage` to show your available and total daily Forge credits.
+
 ## Forge MCP
 
 Forge MCP tools are available in OpenCode. Skill prompts from this connection do not appear as slash

@@ -17,6 +17,7 @@ const ResultSchema = z.object({
   unchanged: z.boolean(),
   updatedDesktop: z.string(),
   updatedRouter: z.string(),
+  usageReports: z.array(z.string()),
 });
 
 for (const host of ["omp", "opencode"]) {
@@ -52,6 +53,15 @@ for (const host of ["omp", "opencode"]) {
       expect(result.failureReported).toBe(true);
       expect(result.cleared).toBe(true);
       expect(result.reloads).toBeGreaterThan(0);
+      expect(result.usageReports[0]).toBe(
+        "Forge daily credits\nAvailable: 12.35 credits\nTotal: 100.00 credits"
+      );
+      expect(result.usageReports[1]).toBe(
+        "Forge daily credits\nAvailable: 0.00 credits\nTotal: 100.00 credits"
+      );
+      expect(result.usageReports[2]).toContain("Forge balance unavailable.");
+      expect(result.usageReports[3]).toContain("Forge balance unavailable.");
+      expect(result.usageReports.join("\n")).not.toContain("Private");
 
       if (host === "opencode") {
         const url = new URL(z.string().parse(result.mcpUrl));

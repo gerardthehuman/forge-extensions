@@ -15,6 +15,8 @@ process.env.FORGE_ROUTER_BASE_URL = baseUrl;
 
 let generation = 1;
 let offline = false;
+const budget = { dailyBudgetCredits: 100, remainingCredits: 12.345 };
+let invalidBudget = false;
 let gate = Promise.withResolvers<undefined>();
 
 gate.resolve(undefined);
@@ -63,6 +65,7 @@ await mock.module("@forge/code-client", () => ({
         ),
       providers: async () =>
         await Promise.resolve({ forge: { options: { baseURL: "http://localhost:9999" } } }),
+      usage: () => ({ value: Promise.resolve({ budget: invalidBudget ? undefined : budget }) }),
     };
   },
 }));
@@ -130,6 +133,7 @@ const context = {
 };
 
 let refresh: (() => Promise<void>) | undefined;
+let usage: (() => Promise<void>) | undefined;
 let cleanup: (() => void) | undefined;
 let ms = 0;
 let mcpUrl: string | undefined;
@@ -167,6 +171,13 @@ if (host === "omp") {
       publications += 1;
       providers.set(id, provider);
     },
+    sendMessage: ({ content }: { content: string }, { triggerTurn }: { triggerTurn: boolean }) => {
+      if (triggerTurn) {
+        throw new Error("Usage must not trigger model generation");
+      }
+
+      notifications.push(content);
+    },
     unregisterProvider: (id: string) => {
       providers.delete(id);
     },
@@ -184,6 +195,16 @@ if (host === "omp") {
 
   refresh = async () => {
     await command.handler("", context);
+  };
+
+  const usageCommand = commands.get("forge");
+
+  if (usageCommand === undefined) {
+    throw new Error("OMP usage command is missing");
+  }
+
+  usage = async () => {
+    await usageCommand.handler("usage", context);
   };
 } else {
   const { default: plugin } = await import("../../opencode-forge/index.ts");
@@ -214,6 +235,12 @@ if (host === "omp") {
           add: (command) => {
             if (command.name === "forge:refresh") {
               refresh = async () => {
+                await command.execute({ sessionID: "fixture" });
+              };
+            }
+
+            if (command.name === "forge:usage") {
+              usage = async () => {
                 await command.execute({ sessionID: "fixture" });
               };
             }
@@ -274,7 +301,23 @@ if (host === "omp") {
       },
     },
     session: {
-      synthetic: async ({ text }: { text: string }) => {
+      synthetic: async ({
+        text,
+        description,
+        resume,
+      }: {
+        text: string;
+        description?: string;
+        resume: boolean;
+      }) => {
+        if (resume) {
+          throw new Error("Command must not resume model generation");
+        }
+
+        if (description !== text) {
+          throw new Error("Command output must be visible in the session notice");
+        }
+
         notifications.push(text);
         await Promise.resolve();
       },
@@ -302,6 +345,25 @@ try {
   const updatedDesktop = providers.get("forge")?.models?.[0]?.name;
   const updatedRouter = providers.get("forge-router")?.models?.[0]?.name;
   const saved = await catalogs.readRouterCatalog(baseUrl, key);
+  const usageCommand = usage;
+
+  if (usageCommand === undefined) {
+    throw new Error("Usage command is missing");
+  }
+
+  const usageReports: string[] = [];
+
+  const reportUsage = async () => {
+    await usageCommand();
+    usageReports.push(notifications.at(-1) ?? "");
+  };
+
+  await reportUsage();
+  budget.remainingCredits = 0;
+  await reportUsage();
+  invalidBudget = true;
+  await reportUsage();
+  invalidBudget = false;
   const published = publications;
   await refresh();
   const unchanged = publications === published;
@@ -309,6 +371,7 @@ try {
   await refresh();
   const retained = providers.get("forge-router")?.models?.[0]?.name === updatedRouter;
   const failureReported = notifications.at(-1)?.includes("failed");
+  await reportUsage();
   offline = false;
   generation = 3;
   await refresh();
@@ -329,6 +392,7 @@ try {
       unchanged,
       updatedDesktop,
       updatedRouter,
+      usageReports,
     })
   );
 } finally {

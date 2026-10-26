@@ -1,8 +1,8 @@
 import { readDesktopCatalog, refreshDesktopCatalog } from "@forge/models/catalogs";
 import type { DesktopCatalog } from "@forge/models/catalogs";
+import { readForgeUsage } from "@forge/models/usage";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 
-import { readForgeUsage } from "./forge.ts";
 import { mapForgeModels } from "./models.ts";
 
 const UNAVAILABLE =

@@ -10084,6 +10084,150 @@ var RouterResponseSchema = object2({ data: array2(object2({ id: string4().min(1)
       Pending.delete(id);
   }
 };
+// ../models/src/usage.ts
+var BudgetSchema = object2({
+  dailyBudgetCredits: number4().nonnegative(),
+  remainingCredits: number4().nonnegative()
+}), readForgeUsage = async () => {
+  let usage = await (await useForgeClient()).usage().value, budget = BudgetSchema.safeParse(usage?.budget);
+  if (!budget.success)
+    throw Error("Forge returned an invalid balance.");
+  let { remainingCredits: available, dailyBudgetCredits: total } = budget.data;
+  return `Forge daily credits
+Available: ${available.toFixed(2)} credits
+Total: ${total.toFixed(2)} credits`;
+};
+
+// src/models.ts
+var EFFORT_PAYLOADS = ["minimal", "low", "medium", "high", "xhigh", "max"], isEffort = (value) => typeof value === "string" && EFFORT_PAYLOADS.some((payload) => payload === value), OMP_EFFORTS = EFFORT_PAYLOADS.map((payload) => {
+  if (!isEffort(payload))
+    throw Error(`Unknown thinking effort: ${payload}`);
+  return payload;
+}), tokenCost = (cost) => ({
+  cacheRead: cost.cache_read ?? 0,
+  cacheWrite: cost.cache_write ?? 0,
+  input: cost.input,
+  output: cost.output
+}), modelCost = (cost) => {
+  if (!cost)
+    throw Error("Forge model is missing token pricing.");
+  let mapped = tokenCost(cost), tiers = (cost.tiers ?? []).filter(({ tier }) => tier?.type === "context").toSorted((a, b) => a.tier.size - b.tier.size);
+  if (tiers.length)
+    mapped.longContext = {
+      ...tokenCost(tiers[0]),
+      inputThreshold: tiers[0].tier.size
+    };
+  return mapped;
+}, mapForgeModels = (catalog) => Object.values(catalog).map((model) => {
+  let effortValues = model.reasoning_options?.filter((option) => option.type === "effort").flatMap((option) => option.values) ?? [], efforts = OMP_EFFORTS.filter((effort) => effortValues.some((value) => isEffort(value) && value === effort)), thinking = model.reasoning && efforts.length ? { efforts, mode: "effort" } : void 0, cost = modelCost(model.cost), contextWindow = Math.min(model.limit.context, cost.longContext?.inputThreshold ?? model.limit.context), reasoningCompat = {
+    allowsSyntheticReasoningContentForToolCalls: !0,
+    disableReasoningOnForcedToolChoice: !1,
+    disableReasoningOnToolChoice: !1,
+    disableReasoningWithTools: !1,
+    extraBody: {},
+    omitReasoningEffort: efforts.length === 0,
+    qwenPreserveThinking: !1,
+    qwenTemplateReasoningEffort: !1,
+    reasoningContentField: "reasoning",
+    reasoningDisableMode: "openrouter-enabled-false",
+    reasoningEffortMap: Object.fromEntries(efforts.map((effort) => [effort, effort])),
+    replayReasoningContent: !1,
+    requiresReasoningContentForAllAssistantTurns: !1,
+    requiresReasoningContentForToolCalls: model.reasoning,
+    requiresThinkingAsText: !1,
+    supportsReasoningEffort: efforts.length > 0,
+    supportsReasoningParams: !0,
+    thinkingFormat: "openrouter"
+  };
+  return {
+    compat: {
+      ...reasoningCompat,
+      alwaysSendMaxTokens: !1,
+      clampOutputToModelMax: !0,
+      isOpenRouterHost: !0,
+      maxTokensField: "max_tokens",
+      supportsDeveloperRole: !1,
+      supportsMultipleSystemMessages: !0,
+      supportsStore: !1,
+      supportsUsageInStreaming: !0,
+      whenThinking: reasoningCompat,
+      wireModelIdMode: "raw"
+    },
+    contextWindow,
+    cost,
+    id: model.id,
+    input: model.modalities.input.filter((type) => type === "text" || type === "image"),
+    maxContextWindow: model.limit.context,
+    maxTokens: model.limit.output,
+    name: model.name,
+    reasoning: model.reasoning,
+    supportsTools: model.tool_call,
+    thinking
+  };
+});
+
+// src/desktop.ts
+var UNAVAILABLE = "Forge is unavailable or returned an invalid catalog. Start Forge Desktop, then restart OMP.";
+async function forgeDesktopPlugin(pi) {
+  let loadError, registered = !1, signature, cached = !1, show = (content) => {
+    pi.sendMessage({ content, customType: "forge", display: !0 }, { triggerTurn: !1 });
+  }, register = ({ options, models: catalog }) => {
+    let models = mapForgeModels(catalog), updated = JSON.stringify({ catalog, options });
+    if (signature === updated)
+      return models.length;
+    if (registered)
+      pi.unregisterProvider("forge");
+    return pi.registerProvider("forge", {
+      api: "openai-completions",
+      apiKey: options.apiKey,
+      baseUrl: options.baseURL,
+      fetchDynamicModels: async () => await Promise.resolve(models),
+      headers: options.headers,
+      models
+    }), registered = !0, signature = updated, loadError = void 0, models.length;
+  }, refresh = async () => register(await refreshDesktopCatalog()), update = async (ctx) => {
+    await refresh(), await ctx.modelRegistry.refreshRuntimeProviders("online");
+  };
+  pi.registerCommand("forge", {
+    description: "Forge: /forge usage",
+    handler: async (args) => {
+      let [command, ...rest] = args.trim().split(/\s+/u);
+      if (command === "usage" && rest.length === 0) {
+        try {
+          show(await readForgeUsage());
+        } catch {
+          show("Forge balance unavailable. Start Forge Desktop and wait for its usage snapshot, then run /forge usage again.");
+        }
+        return;
+      }
+      show("Usage: /forge usage");
+    }
+  }), pi.on("session_start", (_event, ctx) => {
+    if (loadError !== void 0)
+      ctx.ui.notify(loadError, "error");
+    if (cached)
+      ctx.setTimeout(() => {
+        update(ctx).catch(() => {
+          ctx.ui.notify("Forge refresh failed; cached models retained.", "warning");
+        });
+      }, 0);
+  });
+  try {
+    let catalog = await readDesktopCatalog();
+    cached = catalog !== void 0, register(catalog ?? await refreshDesktopCatalog());
+  } catch {
+    loadError = UNAVAILABLE, console.error(`[forge] ${loadError}`);
+  }
+  return refresh;
+}
+
+// src/mcp.ts
+import path5 from "node:path";
+import { fileURLToPath } from "node:url";
+import { getCapability, registerProvider } from "@oh-my-pi/pi-coding-agent/capability";
+import { mcpCapability } from "@oh-my-pi/pi-coding-agent/capability/mcp";
+import { findScopedSettings } from "@oh-my-pi/pi-coding-agent/config/settings";
+
 // node_modules/zod/v4/core/util.js
 function getEnumValues3(entries) {
   let numericValues = Object.values(entries).filter((v) => typeof v === "number");
@@ -10118,12 +10262,6 @@ function nullish3(input) {
 function cleanRegex3(source) {
   let start = source.startsWith("^") ? 1 : 0, end = source.endsWith("$") ? source.length - 1 : source.length;
   return source.slice(start, end);
-}
-function floatSafeRemainder3(val, step) {
-  let ratio = val / step, roundedRatio = Math.round(ratio), tolerance = 4 * Number.EPSILON * Math.max(Math.abs(ratio), 1);
-  if (Math.abs(ratio - roundedRatio) < tolerance)
-    return 0;
-  return ratio - roundedRatio;
 }
 function assignProp3(target, prop, value) {
   Object.defineProperty(target, prop, {
@@ -10903,122 +11041,7 @@ var $ZodCheck3 = /* @__PURE__ */ $constructor3("$ZodCheck", (inst, def) => {
 var _whenHasLength2 = (payload) => {
   let val = payload.value;
   return !nullish3(val) && val.length !== void 0;
-}, numericOriginMap3 = {
-  number: "number",
-  bigint: "bigint",
-  object: "date"
-}, $ZodCheckLessThan3 = /* @__PURE__ */ $constructor3("$ZodCheckLessThan", (inst, def) => {
-  $ZodCheck3.init(inst, def);
-  let origin = numericOriginMap3[typeof def.value];
-  inst._zod.check = (payload) => {
-    if (def.inclusive ? payload.value <= def.value : payload.value < def.value)
-      return;
-    payload.issues.push({
-      origin: numericOriginMap3[typeof payload.value] ?? origin,
-      code: "too_big",
-      maximum: typeof def.value === "object" ? def.value.getTime() : def.value,
-      input: payload.value,
-      inclusive: def.inclusive,
-      inst,
-      continue: !def.abort
-    });
-  };
-}), $ZodCheckGreaterThan3 = /* @__PURE__ */ $constructor3("$ZodCheckGreaterThan", (inst, def) => {
-  $ZodCheck3.init(inst, def);
-  let origin = numericOriginMap3[typeof def.value];
-  inst._zod.check = (payload) => {
-    if (def.inclusive ? payload.value >= def.value : payload.value > def.value)
-      return;
-    payload.issues.push({
-      origin: numericOriginMap3[typeof payload.value] ?? origin,
-      code: "too_small",
-      minimum: typeof def.value === "object" ? def.value.getTime() : def.value,
-      input: payload.value,
-      inclusive: def.inclusive,
-      inst,
-      continue: !def.abort
-    });
-  };
-}), $ZodCheckMultipleOf3 = /* @__PURE__ */ $constructor3("$ZodCheckMultipleOf", (inst, def) => {
-  $ZodCheck3.init(inst, def), inst._zod.check = (payload) => {
-    if (typeof payload.value !== typeof def.value)
-      throw Error("Cannot mix number and bigint in multiple_of check.");
-    if (typeof payload.value === "bigint" ? def.value !== BigInt(0) && payload.value % def.value === BigInt(0) : floatSafeRemainder3(payload.value, def.value) === 0)
-      return;
-    payload.issues.push({
-      origin: typeof payload.value,
-      code: "not_multiple_of",
-      divisor: def.value,
-      input: payload.value,
-      inst,
-      continue: !def.abort
-    });
-  };
-}), $ZodCheckNumberFormat3 = /* @__PURE__ */ $constructor3("$ZodCheckNumberFormat", (inst, def) => {
-  $ZodCheck3.init(inst, def), def.format = def.format || "float64";
-  let isInt = def.format?.includes("int"), origin = isInt ? "int" : "number", [minimum, maximum] = NUMBER_FORMAT_RANGES3[def.format];
-  inst._zod.check = (payload) => {
-    let input = payload.value;
-    if (isInt) {
-      if (!Number.isInteger(input)) {
-        payload.issues.push({
-          expected: origin,
-          format: def.format,
-          code: "invalid_type",
-          continue: !1,
-          input,
-          inst
-        });
-        return;
-      }
-      if (!Number.isSafeInteger(input)) {
-        if (input > 0)
-          payload.issues.push({
-            input,
-            code: "too_big",
-            maximum: Number.MAX_SAFE_INTEGER,
-            note: "Integers must be within the safe integer range.",
-            inst,
-            origin,
-            inclusive: !0,
-            continue: !def.abort
-          });
-        else
-          payload.issues.push({
-            input,
-            code: "too_small",
-            minimum: Number.MIN_SAFE_INTEGER,
-            note: "Integers must be within the safe integer range.",
-            inst,
-            origin,
-            inclusive: !0,
-            continue: !def.abort
-          });
-        return;
-      }
-    }
-    if (input < minimum)
-      payload.issues.push({
-        origin: "number",
-        input,
-        code: "too_small",
-        minimum,
-        inclusive: !0,
-        inst,
-        continue: !def.abort
-      });
-    if (input > maximum)
-      payload.issues.push({
-        origin: "number",
-        input,
-        code: "too_big",
-        maximum,
-        inclusive: !0,
-        inst,
-        continue: !def.abort
-      });
-  };
-});
+};
 var $ZodCheckMaxLength3 = /* @__PURE__ */ $constructor3("$ZodCheckMaxLength", (inst, def) => {
   var _a;
   $ZodCheck3.init(inst, def), (_a = inst._zod.def).when ?? (_a.when = _whenHasLength2), inst._zod.check = (payload) => {
@@ -11592,27 +11615,6 @@ var $ZodJWT3 = /* @__PURE__ */ $constructor3("$ZodJWT", (inst, def) => {
       continue: !def.abort
     });
   };
-});
-var $ZodNumber3 = /* @__PURE__ */ $constructor3("$ZodNumber", (inst, def) => {
-  $ZodType3.init(inst, def), inst._zod.pattern = number5, inst._zod.parse = (payload, _ctx) => {
-    if (def.coerce)
-      try {
-        payload.value = Number(payload.value);
-      } catch (_) {}
-    let input = payload.value;
-    if (typeof input === "number" && !Number.isNaN(input) && Number.isFinite(input))
-      return payload;
-    let received = typeof input === "number" ? Number.isNaN(input) ? "NaN" : !Number.isFinite(input) ? String(input) : void 0 : void 0;
-    return payload.issues.push({
-      expected: "number",
-      code: "invalid_type",
-      input,
-      inst,
-      ...received ? { received } : {}
-    }), payload;
-  };
-}), $ZodNumberFormat3 = /* @__PURE__ */ $constructor3("$ZodNumberFormat", (inst, def) => {
-  $ZodCheckNumberFormat3.init(inst, def), $ZodNumber3.init(inst, def);
 });
 var $ZodUnknown3 = /* @__PURE__ */ $constructor3("$ZodUnknown", (inst, def) => {
   $ZodType3.init(inst, def), inst._zod.parse = (payload) => payload;
@@ -12987,18 +12989,6 @@ function _isoDuration3(Class, params) {
     ...normalizeParams3(params)
   });
 }
-function _number3(Class, params) {
-  return new Class(snapshotChecks2({ type: "number", checks: [], ...normalizeParams3(params) }));
-}
-function _int3(Class, params) {
-  return new Class({
-    type: "number",
-    check: "number_format",
-    abort: !1,
-    format: "safeint",
-    ...normalizeParams3(params)
-  });
-}
 function _unknown3(Class) {
   return new Class({
     type: "unknown"
@@ -13008,45 +12998,6 @@ function _never3(Class, params) {
   return new Class({
     type: "never",
     ...normalizeParams3(params)
-  });
-}
-function _lt3(value, params) {
-  return new $ZodCheckLessThan3({
-    check: "less_than",
-    ...normalizeParams3(params),
-    value,
-    inclusive: !1
-  });
-}
-function _lte3(value, params) {
-  return new $ZodCheckLessThan3({
-    check: "less_than",
-    ...normalizeParams3(params),
-    value,
-    inclusive: !0
-  });
-}
-function _gt3(value, params) {
-  return new $ZodCheckGreaterThan3({
-    check: "greater_than",
-    ...normalizeParams3(params),
-    value,
-    inclusive: !1
-  });
-}
-function _gte3(value, params) {
-  return new $ZodCheckGreaterThan3({
-    check: "greater_than",
-    ...normalizeParams3(params),
-    value,
-    inclusive: !0
-  });
-}
-function _multipleOf3(value, params) {
-  return new $ZodCheckMultipleOf3({
-    check: "multiple_of",
-    ...normalizeParams3(params),
-    value
   });
 }
 function _maxLength3(maximum, params) {
@@ -13730,37 +13681,6 @@ var formatMap3 = {
           pattern: regex.source
         }))
       ];
-  }
-}, numberProcessor3 = (schema, ctx, _json, params) => {
-  let json = _json, { minimum, maximum, multipleOf, exclusiveMaximum, exclusiveMinimum, isInt } = aggregateChecks2(schema);
-  json.type = isInt ? "integer" : "number";
-  let exMin = typeof exclusiveMinimum === "number" && exclusiveMinimum >= (minimum ?? Number.NEGATIVE_INFINITY), exMax = typeof exclusiveMaximum === "number" && exclusiveMaximum <= (maximum ?? Number.POSITIVE_INFINITY), legacy = ctx.target === "draft-04" || ctx.target === "openapi-3.0";
-  if (exMin)
-    if (legacy)
-      json.minimum = exclusiveMinimum, json.exclusiveMinimum = !0;
-    else
-      json.exclusiveMinimum = exclusiveMinimum;
-  else if (typeof minimum === "number")
-    json.minimum = minimum;
-  if (exMax)
-    if (legacy)
-      json.maximum = exclusiveMaximum, json.exclusiveMaximum = !0;
-    else
-      json.exclusiveMaximum = exclusiveMaximum;
-  else if (typeof maximum === "number")
-    json.maximum = maximum;
-  if (multipleOf) {
-    let divisors = /* @__PURE__ */ new Set;
-    for (let divisor of multipleOf)
-      if (Number.isFinite(divisor) && divisor !== 0)
-        divisors.add(Math.abs(divisor));
-      else
-        handleUnrepresentable2(schema, ctx, json, params, `A multipleOf divisor of ${divisor} cannot be represented in JSON Schema`);
-    let [first, ...rest] = divisors;
-    if (first !== void 0)
-      json.multipleOf = first;
-    if (rest.length)
-      json.allOf = [...json.allOf ?? [], ...rest.map((m) => ({ multipleOf: m }))];
   }
 };
 var neverProcessor3 = (_schema, _ctx, json, _params) => {
@@ -14463,78 +14383,6 @@ var ZodE1643 = /* @__PURE__ */ $constructor3("ZodE164", (inst, def) => {
 var ZodJWT3 = /* @__PURE__ */ $constructor3("ZodJWT", (inst, def) => {
   $ZodJWT3.init(inst, def), ZodStringFormat3.init(inst, def);
 });
-var ZodNumber3 = /* @__PURE__ */ $constructor3("ZodNumber", (inst, def) => {
-  $ZodNumber3.init(inst, def), ZodType3.init(inst, def), inst._zod.processJSONSchema = (ctx, json, params) => numberProcessor3(inst, ctx, json, params), inst.isFinite = !0;
-}, /* @__PURE__ */ derived2({
-  minValue: (inst) => {
-    let { minimum, exclusiveMinimum } = aggregateChecks2(inst);
-    return Math.max(minimum ?? Number.NEGATIVE_INFINITY, exclusiveMinimum ?? Number.NEGATIVE_INFINITY);
-  },
-  maxValue: (inst) => {
-    let { maximum, exclusiveMaximum } = aggregateChecks2(inst);
-    return Math.min(maximum ?? Number.POSITIVE_INFINITY, exclusiveMaximum ?? Number.POSITIVE_INFINITY);
-  },
-  isInt: (inst) => {
-    let { isInt, multipleOf } = aggregateChecks2(inst);
-    return !!isInt || !!multipleOf?.some(Number.isSafeInteger);
-  },
-  format: (inst) => aggregateChecks2(inst).format ?? null
-}, {
-  gt(value, params) {
-    return this.check(_gt3(value, params));
-  },
-  gte(value, params) {
-    return this.check(_gte3(value, params));
-  },
-  min(value, params) {
-    return this.check(_gte3(value, params));
-  },
-  lt(value, params) {
-    return this.check(_lt3(value, params));
-  },
-  lte(value, params) {
-    return this.check(_lte3(value, params));
-  },
-  max(value, params) {
-    return this.check(_lte3(value, params));
-  },
-  int(params) {
-    return this.check(int3(params));
-  },
-  safe(params) {
-    return this.check(int3(params));
-  },
-  positive(params) {
-    return this.check(_gt3(0, params));
-  },
-  nonnegative(params) {
-    return this.check(_gte3(0, params));
-  },
-  negative(params) {
-    return this.check(_lt3(0, params));
-  },
-  nonpositive(params) {
-    return this.check(_lte3(0, params));
-  },
-  multipleOf(value, params) {
-    return this.check(_multipleOf3(value, params));
-  },
-  step(value, params) {
-    return this.check(_multipleOf3(value, params));
-  },
-  finite() {
-    return this;
-  }
-}));
-function number6(params) {
-  return _number3(ZodNumber3, params);
-}
-var ZodNumberFormat3 = /* @__PURE__ */ $constructor3("ZodNumberFormat", (inst, def) => {
-  $ZodNumberFormat3.init(inst, def), ZodNumber3.init(inst, def);
-});
-function int3(params) {
-  return _int3(ZodNumberFormat3, params);
-}
 var ZodUnknown3 = /* @__PURE__ */ $constructor3("ZodUnknown", (inst, def) => {
   $ZodUnknown3.init(inst, def), ZodType3.init(inst, def), inst._zod.processJSONSchema = (ctx, json, params) => unknownProcessor3(inst, ctx, json, params);
 });
@@ -14843,150 +14691,6 @@ function refine3(fn, _params = {}) {
 function superRefine3(fn, params) {
   return _superRefine3(fn, params);
 }
-// src/forge.ts
-var BudgetSchema = object3({
-  dailyBudgetCredits: number6().nonnegative(),
-  remainingCredits: number6().nonnegative()
-}), readForgeUsage = async () => {
-  let usage = await (await useForgeClient()).usage().value, budget = BudgetSchema.safeParse(usage?.budget);
-  if (!budget.success)
-    throw Error("Forge returned an invalid balance.");
-  let { remainingCredits: available, dailyBudgetCredits: total } = budget.data;
-  return `Forge daily credits
-Available: ${available.toFixed(2)} credits
-Total: ${total.toFixed(2)} credits`;
-};
-
-// src/models.ts
-var EFFORT_PAYLOADS = ["minimal", "low", "medium", "high", "xhigh", "max"], isEffort = (value) => typeof value === "string" && EFFORT_PAYLOADS.some((payload) => payload === value), OMP_EFFORTS = EFFORT_PAYLOADS.map((payload) => {
-  if (!isEffort(payload))
-    throw Error(`Unknown thinking effort: ${payload}`);
-  return payload;
-}), tokenCost = (cost) => ({
-  cacheRead: cost.cache_read ?? 0,
-  cacheWrite: cost.cache_write ?? 0,
-  input: cost.input,
-  output: cost.output
-}), modelCost = (cost) => {
-  if (!cost)
-    throw Error("Forge model is missing token pricing.");
-  let mapped = tokenCost(cost), tiers = (cost.tiers ?? []).filter(({ tier }) => tier?.type === "context").toSorted((a, b) => a.tier.size - b.tier.size);
-  if (tiers.length)
-    mapped.longContext = {
-      ...tokenCost(tiers[0]),
-      inputThreshold: tiers[0].tier.size
-    };
-  return mapped;
-}, mapForgeModels = (catalog) => Object.values(catalog).map((model) => {
-  let effortValues = model.reasoning_options?.filter((option) => option.type === "effort").flatMap((option) => option.values) ?? [], efforts = OMP_EFFORTS.filter((effort) => effortValues.some((value) => isEffort(value) && value === effort)), thinking = model.reasoning && efforts.length ? { efforts, mode: "effort" } : void 0, cost = modelCost(model.cost), contextWindow = Math.min(model.limit.context, cost.longContext?.inputThreshold ?? model.limit.context), reasoningCompat = {
-    allowsSyntheticReasoningContentForToolCalls: !0,
-    disableReasoningOnForcedToolChoice: !1,
-    disableReasoningOnToolChoice: !1,
-    disableReasoningWithTools: !1,
-    extraBody: {},
-    omitReasoningEffort: efforts.length === 0,
-    qwenPreserveThinking: !1,
-    qwenTemplateReasoningEffort: !1,
-    reasoningContentField: "reasoning",
-    reasoningDisableMode: "openrouter-enabled-false",
-    reasoningEffortMap: Object.fromEntries(efforts.map((effort) => [effort, effort])),
-    replayReasoningContent: !1,
-    requiresReasoningContentForAllAssistantTurns: !1,
-    requiresReasoningContentForToolCalls: model.reasoning,
-    requiresThinkingAsText: !1,
-    supportsReasoningEffort: efforts.length > 0,
-    supportsReasoningParams: !0,
-    thinkingFormat: "openrouter"
-  };
-  return {
-    compat: {
-      ...reasoningCompat,
-      alwaysSendMaxTokens: !1,
-      clampOutputToModelMax: !0,
-      isOpenRouterHost: !0,
-      maxTokensField: "max_tokens",
-      supportsDeveloperRole: !1,
-      supportsMultipleSystemMessages: !0,
-      supportsStore: !1,
-      supportsUsageInStreaming: !0,
-      whenThinking: reasoningCompat,
-      wireModelIdMode: "raw"
-    },
-    contextWindow,
-    cost,
-    id: model.id,
-    input: model.modalities.input.filter((type) => type === "text" || type === "image"),
-    maxContextWindow: model.limit.context,
-    maxTokens: model.limit.output,
-    name: model.name,
-    reasoning: model.reasoning,
-    supportsTools: model.tool_call,
-    thinking
-  };
-});
-
-// src/desktop.ts
-var UNAVAILABLE = "Forge is unavailable or returned an invalid catalog. Start Forge Desktop, then restart OMP.";
-async function forgeDesktopPlugin(pi) {
-  let loadError, registered = !1, signature, cached = !1, show = (content) => {
-    pi.sendMessage({ content, customType: "forge", display: !0 }, { triggerTurn: !1 });
-  }, register = ({ options, models: catalog }) => {
-    let models = mapForgeModels(catalog), updated = JSON.stringify({ catalog, options });
-    if (signature === updated)
-      return models.length;
-    if (registered)
-      pi.unregisterProvider("forge");
-    return pi.registerProvider("forge", {
-      api: "openai-completions",
-      apiKey: options.apiKey,
-      baseUrl: options.baseURL,
-      fetchDynamicModels: async () => await Promise.resolve(models),
-      headers: options.headers,
-      models
-    }), registered = !0, signature = updated, loadError = void 0, models.length;
-  }, refresh = async () => register(await refreshDesktopCatalog()), update = async (ctx) => {
-    await refresh(), await ctx.modelRegistry.refreshRuntimeProviders("online");
-  };
-  pi.registerCommand("forge", {
-    description: "Forge: /forge usage",
-    handler: async (args) => {
-      let [command, ...rest] = args.trim().split(/\s+/u);
-      if (command === "usage" && rest.length === 0) {
-        try {
-          show(await readForgeUsage());
-        } catch {
-          show("Forge balance unavailable. Start Forge Desktop and wait for its usage snapshot, then run /forge usage again.");
-        }
-        return;
-      }
-      show("Usage: /forge usage");
-    }
-  }), pi.on("session_start", (_event, ctx) => {
-    if (loadError !== void 0)
-      ctx.ui.notify(loadError, "error");
-    if (cached)
-      ctx.setTimeout(() => {
-        update(ctx).catch(() => {
-          ctx.ui.notify("Forge refresh failed; cached models retained.", "warning");
-        });
-      }, 0);
-  });
-  try {
-    let catalog = await readDesktopCatalog();
-    cached = catalog !== void 0, register(catalog ?? await refreshDesktopCatalog());
-  } catch {
-    loadError = UNAVAILABLE, console.error(`[forge] ${loadError}`);
-  }
-  return refresh;
-}
-
-// src/mcp.ts
-import path5 from "node:path";
-import { fileURLToPath } from "node:url";
-import { getCapability, registerProvider } from "@oh-my-pi/pi-coding-agent/capability";
-import { mcpCapability } from "@oh-my-pi/pi-coding-agent/capability/mcp";
-import { findScopedSettings } from "@oh-my-pi/pi-coding-agent/config/settings";
-
 // src/mcp-config.ts
 var ServersSchema = object3({
   forge: object3({ headers: unknown3().optional(), type: literal2("remote"), url: string6() })

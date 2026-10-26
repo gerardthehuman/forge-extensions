@@ -9,6 +9,7 @@ import {
   refreshDesktopCatalog,
 } from "@forge/models/catalogs";
 import type { DesktopCatalog } from "@forge/models/catalogs";
+import { readForgeUsage } from "@forge/models/usage";
 import { Plugin, Integration } from "@opencode/plugin";
 import type { Model } from "@opencode/plugin";
 import { Provider } from "@opencode/schema/provider";
@@ -267,6 +268,22 @@ export default Plugin.define({
 
     await ctx.command.transform((editor) => {
       editor.add({
+        description: "Show available and total Forge daily credits",
+        execute: async ({ sessionID }) => {
+          let text: string;
+
+          try {
+            text = await readForgeUsage();
+          } catch {
+            text =
+              "Forge balance unavailable. Start Forge Desktop and wait for its usage snapshot, then run /forge:usage again.";
+          }
+
+          await ctx.session.synthetic({ description: text, resume: false, sessionID, text });
+        },
+        name: "forge:usage",
+      });
+      editor.add({
         description: "Refresh Forge models and the shared cache",
         execute: async ({ sessionID }) => {
           const results = await Promise.allSettled([refreshForge(), refreshRouter(true)]);
@@ -286,7 +303,7 @@ export default Plugin.define({
             routerMessage,
           ].join("\n");
 
-          await ctx.session.synthetic({ resume: false, sessionID, text });
+          await ctx.session.synthetic({ description: text, resume: false, sessionID, text });
         },
         name: "forge:refresh",
       });

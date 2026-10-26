@@ -10089,6 +10089,20 @@ var RouterResponseSchema = object2({ data: array2(object2({ id: string4().min(1)
       Pending.delete(id);
   }
 };
+// ../models/src/usage.ts
+var BudgetSchema = object2({
+  dailyBudgetCredits: number4().nonnegative(),
+  remainingCredits: number4().nonnegative()
+}), readForgeUsage = async () => {
+  let usage = await (await useForgeClient()).usage().value, budget = BudgetSchema.safeParse(usage?.budget);
+  if (!budget.success)
+    throw Error("Forge returned an invalid balance.");
+  let { remainingCredits: available, dailyBudgetCredits: total } = budget.data;
+  return `Forge daily credits
+Available: ${available.toFixed(2)} credits
+Total: ${total.toFixed(2)} credits`;
+};
+
 // ../../node_modules/.bun/@opencode+plugin@2.1.4+7e97d3cf946b0ea2/node_modules/@opencode/plugin/dist/promise/plugin.js
 function define(plugin) {
   return plugin;
@@ -17949,6 +17963,18 @@ var serverFile = path5.join(homedir4(), ".forge", "server.json"), ROUTER_ID = "f
           await refreshRouter().catch(reportRouterError);
     })().catch(reportEventError), await ctx.command.transform((editor) => {
       editor.add({
+        description: "Show available and total Forge daily credits",
+        execute: async ({ sessionID }) => {
+          let text;
+          try {
+            text = await readForgeUsage();
+          } catch {
+            text = "Forge balance unavailable. Start Forge Desktop and wait for its usage snapshot, then run /forge:usage again.";
+          }
+          await ctx.session.synthetic({ description: text, resume: !1, sessionID, text });
+        },
+        name: "forge:usage"
+      }), editor.add({
         description: "Refresh Forge models and the shared cache",
         execute: async ({ sessionID }) => {
           let results = await Promise.allSettled([refreshForge(), refreshRouter(!0)]), [desktop, router] = results, routerMessage = "Forge Router: not connected";
@@ -17961,7 +17987,7 @@ var serverFile = path5.join(homedir4(), ".forge", "server.json"), ROUTER_ID = "f
             routerMessage
           ].join(`
 `);
-          await ctx.session.synthetic({ resume: !1, sessionID, text });
+          await ctx.session.synthetic({ description: text, resume: !1, sessionID, text });
         },
         name: "forge:refresh"
       });
