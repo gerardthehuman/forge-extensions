@@ -28,7 +28,7 @@ const result = await Bun.build({
   entrypoints: entrypoints.map((entry) => path.join(root, entry)),
   env: "disable",
   // Use the running host's capability registry, including in the compiled OMP CLI.
-  external: ["@oh-my-pi/pi-coding-agent", "@oh-my-pi/pi-coding-agent/*"],
+  external: ["@oh-my-pi/pi-coding-agent", "@oh-my-pi/pi-coding-agent/*", "@oh-my-pi/pi-ai"],
   format: "esm",
   metafile: true,
   minify: { syntax: true },

@@ -1,8 +1,8 @@
 import { readDesktopCatalog, refreshDesktopCatalog } from "@forge/models/catalogs";
 import type { DesktopCatalog } from "@forge/models/catalogs";
-import { readForgeUsage } from "@forge/models/usage";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 
+import { BillingProvider, billingModels } from "./billing.ts";
 import { mapForgeModels } from "./models.ts";
 
 const UNAVAILABLE =
@@ -14,12 +14,8 @@ export default async function forgeDesktopPlugin(pi: ExtensionAPI) {
   let signature: string | undefined;
   let cached = false;
 
-  const show = (content: string): void => {
-    pi.sendMessage({ content, customType: "forge", display: true }, { triggerTurn: false });
-  };
-
   const register = ({ options, models: catalog }: DesktopCatalog): number => {
-    const models = mapForgeModels(catalog);
+    const models = billingModels("forge", mapForgeModels(catalog));
     const updated = JSON.stringify({ catalog, options });
 
     if (signature === updated) {
@@ -31,7 +27,7 @@ export default async function forgeDesktopPlugin(pi: ExtensionAPI) {
     }
 
     pi.registerProvider("forge", {
-      api: "openai-completions",
+      ...BillingProvider,
       apiKey: options.apiKey,
       // OMP appends /chat/completions itself; Forge does not use /v1.
       baseUrl: options.baseURL,
@@ -52,27 +48,6 @@ export default async function forgeDesktopPlugin(pi: ExtensionAPI) {
     await refresh();
     await ctx.modelRegistry.refreshRuntimeProviders("online");
   };
-
-  pi.registerCommand("forge", {
-    description: "Forge: /forge usage",
-    handler: async (args) => {
-      const [command, ...rest] = args.trim().split(/\s+/u);
-
-      if (command === "usage" && rest.length === 0) {
-        try {
-          show(await readForgeUsage());
-        } catch {
-          show(
-            "Forge balance unavailable. Start Forge Desktop and wait for its usage snapshot, then run /forge usage again."
-          );
-        }
-
-        return;
-      }
-
-      show("Usage: /forge usage");
-    },
-  });
 
   pi.on("session_start", (_event, ctx) => {
     if (loadError !== undefined) {

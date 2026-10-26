@@ -29,7 +29,20 @@ Saved model catalogs load before network discovery. Both plugins share the cache
 
 ## Usage
 
-Run `/forge:usage` to show your available and total daily Forge credits.
+Run `/forge:usage` to show the current billing account and its available budget. Personal usage
+shows the remaining and total daily dollar amounts. Project usage shows the available dollar amount
+because Forge does not expose the total project allocation.
+
+## Billing
+
+Run `/forge:billing` in the TUI to choose Personal Budget or an available project budget. Each
+choice shows its available balance. The picker accepts only the listed choices. Forge Desktop must
+be running and signed in.
+
+The choice applies to this session and its subagents for Forge Desktop and Forge Router requests.
+Billing changes and usage results appear as transcript notices and stay out of model context.
+Dismiss the picker to keep the current budget. The bundled TUI entrypoint loads automatically with
+the server plugin.
 
 ## Forge MCP
 

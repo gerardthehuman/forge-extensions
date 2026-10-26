@@ -15,7 +15,14 @@ process.env.FORGE_ROUTER_BASE_URL = baseUrl;
 
 let generation = 1;
 let offline = false;
-const budget = { dailyBudgetCredits: 100, remainingCredits: 12.345 };
+
+const budget = {
+  dailyBudgetCredits: 100,
+  dailyBudgetUsd: 100,
+  remainingCredits: 12.345,
+  remainingUsd: 12.345,
+};
+
 let invalidBudget = false;
 let gate = Promise.withResolvers<undefined>();
 
@@ -118,6 +125,7 @@ let reloads = 0;
 let publications = 0;
 
 const context = {
+  agent: { kind: "main" },
   modelRegistry: {
     getApiKeyForProvider: async () => await Promise.resolve(key),
     refreshRuntimeProviders: async () => {
@@ -125,6 +133,7 @@ const context = {
       await Promise.resolve();
     },
   },
+  sessionManager: { getEntries: () => [], getSessionId: () => "fixture" },
   ui: {
     notify: (text: string) => {
       notifications.push(text);
@@ -138,14 +147,16 @@ let cleanup: (() => void) | undefined;
 let ms = 0;
 let mcpUrl: string | undefined;
 let mcpHeaders: Record<string, string> | undefined;
+let commandNames: string[] | undefined;
 
 if (host === "omp") {
   const { default: plugin } = await import("./index.ts");
 
-  const commands = new Map<
-    string,
-    { handler: (args: string, ctx: typeof context) => Promise<void> }
-  >();
+  interface Command {
+    handler: (args: string, ctx: typeof context) => Promise<void>;
+  }
+
+  const commands = new Map<string, Command>();
 
   const pi = {
     on: () => {
@@ -161,22 +172,25 @@ if (host === "omp") {
         }),
       getAgentDir: () => directory,
     },
-    registerCommand: (
-      name: string,
-      command: { handler: (args: string, ctx: typeof context) => Promise<void> }
-    ) => {
+    registerCommand: (name: string, command: Command) => {
       commands.set(name, command);
+    },
+    registerMessageRenderer: () => {
+      /* The cache fixture does not render transcript messages. */
     },
     registerProvider: (id: string, provider: Inventory) => {
       publications += 1;
       providers.set(id, provider);
     },
-    sendMessage: ({ content }: { content: string }, { triggerTurn }: { triggerTurn: boolean }) => {
+    sendMessage: (
+      { details }: { details: { text: string } },
+      { triggerTurn }: { triggerTurn: boolean }
+    ) => {
       if (triggerTurn) {
         throw new Error("Usage must not trigger model generation");
       }
 
-      notifications.push(content);
+      notifications.push(details.text);
     },
     unregisterProvider: (id: string) => {
       providers.delete(id);
@@ -187,24 +201,26 @@ if (host === "omp") {
   // Exercise the real extension factory with only the host methods it uses.
   await Reflect.apply(plugin, undefined, [pi]);
   ms = performance.now() - start;
-  const command = commands.get("forge-refresh");
+  const command = commands.get("forge:refresh");
 
-  if (!command) {
+  if (command === undefined) {
     throw new Error("OMP refresh command is missing");
   }
+
+  commandNames = [...commands.keys()];
 
   refresh = async () => {
     await command.handler("", context);
   };
 
-  const usageCommand = commands.get("forge");
+  const usageCommand = commands.get("forge:usage");
 
   if (usageCommand === undefined) {
     throw new Error("OMP usage command is missing");
   }
 
   usage = async () => {
-    await usageCommand.handler("usage", context);
+    await usageCommand.handler("", context);
   };
 } else {
   const { default: plugin } = await import("../../opencode-forge/index.ts");
@@ -300,7 +316,17 @@ if (host === "omp") {
         await Promise.resolve();
       },
     },
+    rpc: {
+      register: async () => {
+        await Promise.resolve();
+      },
+    },
     session: {
+      get: async ({ sessionID }: { sessionID: string }) =>
+        await Promise.resolve({ id: sessionID, location: { directory }, metadata: {} }),
+      hook: async () => {
+        await Promise.resolve();
+      },
       synthetic: async ({
         text,
         description,
@@ -360,6 +386,7 @@ try {
 
   await reportUsage();
   budget.remainingCredits = 0;
+  budget.remainingUsd = 0;
   await reportUsage();
   invalidBudget = true;
   await reportUsage();
@@ -380,6 +407,7 @@ try {
       cleared:
         providers.get("forge")?.models?.length === 0 &&
         providers.get("forge-router")?.models?.length === 0,
+      commandNames,
       failureReported,
       initialDesktop,
       initialRouter,

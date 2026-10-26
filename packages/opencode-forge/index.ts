@@ -9,11 +9,11 @@ import {
   refreshDesktopCatalog,
 } from "@forge/models/catalogs";
 import type { DesktopCatalog } from "@forge/models/catalogs";
-import { readForgeUsage } from "@forge/models/usage";
 import { Plugin, Integration } from "@opencode/plugin";
 import type { Model } from "@opencode/plugin";
 import { Provider } from "@opencode/schema/provider";
 
+import { billingAccount, billingNotice, registerBilling, usageMessage } from "./src/billing.ts";
 import { forgeModels } from "./src/forge-models.ts";
 import { routerModels } from "./src/router-models.ts";
 import { discoverRouterModels, routerKey } from "./src/router.ts";
@@ -252,6 +252,8 @@ export default Plugin.define({
 
     const controller = new AbortController();
 
+    await registerBilling(ctx);
+
     const observeIntegrationChanges = async () => {
       for await (const event of ctx.event.subscribe({ signal: controller.signal })) {
         if (
@@ -268,18 +270,18 @@ export default Plugin.define({
 
     await ctx.command.transform((editor) => {
       editor.add({
-        description: "Show available and total Forge daily credits",
+        description: "Show the current Forge billing account and available budget",
         execute: async ({ sessionID }) => {
           let text: string;
 
           try {
-            text = await readForgeUsage();
+            text = usageMessage(await billingAccount(ctx, await useForgeClient(), sessionID));
           } catch {
             text =
               "Forge balance unavailable. Start Forge Desktop and wait for its usage snapshot, then run /forge:usage again.";
           }
 
-          await ctx.session.synthetic({ description: text, resume: false, sessionID, text });
+          await billingNotice(ctx, sessionID, text);
         },
         name: "forge:usage",
       });

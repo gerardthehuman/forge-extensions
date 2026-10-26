@@ -13,7 +13,7 @@ const PackageMetadataSchema = z.object({
 
 const root = import.meta.dir;
 const destination = path.resolve(root, "../../plugins/opencode-forge");
-const entrypoints = ["index.ts"];
+const entrypoints = ["index.ts", "tui.ts"];
 
 const manifestResult = PackageMetadataSchema.safeParse(
   JSON.parse(await readFile(path.join(root, "package.json"), "utf-8"))
@@ -28,6 +28,7 @@ const manifest = manifestResult.data;
 const result = await Bun.build({
   entrypoints: entrypoints.map((entry) => path.join(root, entry)),
   env: "disable",
+  external: ["@opencode/plugin/tui"],
   format: "esm",
   metafile: true,
   minify: { syntax: true },
@@ -103,7 +104,7 @@ const built = await Promise.all(
       ? `\n// Third-party licenses\n${notices
           .join("\n\n")
           .split("\n")
-          .map((line) => `// ${line}`)
+          .map((line) => `// ${line}`.trimEnd())
           .join("\n")}\n`
       : "";
 
@@ -119,7 +120,7 @@ for (const name of built) {
 
 const runtime = {
   description: manifest.description,
-  exports: { ".": "./index.js" },
+  exports: { ".": "./index.js", "./tui": "./tui.js" },
   name: manifest.name,
   private: true,
   type: "module",

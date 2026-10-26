@@ -5,6 +5,7 @@ import { z } from "zod";
 
 const ResultSchema = z.object({
   cleared: z.boolean(),
+  commandNames: z.array(z.string()).optional(),
   failureReported: z.boolean(),
   initialDesktop: z.string(),
   initialRouter: z.string(),
@@ -53,15 +54,15 @@ for (const host of ["omp", "opencode"]) {
       expect(result.failureReported).toBe(true);
       expect(result.cleared).toBe(true);
       expect(result.reloads).toBeGreaterThan(0);
-      expect(result.usageReports[0]).toBe(
-        "Forge daily credits\nAvailable: 12.35 credits\nTotal: 100.00 credits"
-      );
-      expect(result.usageReports[1]).toBe(
-        "Forge daily credits\nAvailable: 0.00 credits\nTotal: 100.00 credits"
-      );
+      expect(result.usageReports[0]).toBe("Forge Billing: Personal\n$12.35 of $100.00 left");
+      expect(result.usageReports[1]).toBe("Forge Billing: Personal\n$0.00 of $100.00 left");
       expect(result.usageReports[2]).toContain("Forge balance unavailable.");
       expect(result.usageReports[3]).toContain("Forge balance unavailable.");
       expect(result.usageReports.join("\n")).not.toContain("Private");
+
+      if (host === "omp") {
+        expect(result.commandNames).toEqual(["forge:usage", "forge:billing", "forge:refresh"]);
+      }
 
       if (host === "opencode") {
         const url = new URL(z.string().parse(result.mcpUrl));

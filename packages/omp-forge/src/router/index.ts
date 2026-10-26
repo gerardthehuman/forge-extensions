@@ -3,6 +3,7 @@ import path from "node:path";
 import { readRouterCatalog } from "@forge/models/catalogs";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 
+import { BillingProvider, billingModels } from "../billing.ts";
 import { discoverCatalog, fetchRouterCatalog, readStartupCatalog } from "./catalog.ts";
 import type { DiscoveredCatalog } from "./catalog.ts";
 import { mapOpenRouterModels } from "./models.ts";
@@ -43,13 +44,15 @@ const forgeRouterPlugin = async (pi: ExtensionAPI) => {
     }
 
     pi.registerProvider(PROVIDER, {
-      api: "openai-completions",
+      ...BillingProvider,
       authHeader: true,
       baseUrl,
       // Native discovery publishes this snapshot authoritatively, including empty catalogs.
       fetchDynamicModels: async () =>
-        await Promise.resolve(catalog ? mapOpenRouterModels(catalog.data) : []),
-      models: catalog ? mapOpenRouterModels(catalog.data) : [],
+        await Promise.resolve(
+          catalog ? billingModels(PROVIDER, mapOpenRouterModels(catalog.data)) : []
+        ),
+      models: catalog ? billingModels(PROVIDER, mapOpenRouterModels(catalog.data)) : [],
       oauth: {
         async login(callbacks) {
           const key = await callbacks.onPrompt({

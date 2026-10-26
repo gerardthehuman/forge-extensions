@@ -1,7 +1,8 @@
 {
   "description": "Forge providers and MCP for OpenCode 2",
   "exports": {
-    ".": "./index.js"
+    ".": "./index.js",
+    "./tui": "./tui.js"
   },
   "name": "@forge/opencode",
   "private": true,

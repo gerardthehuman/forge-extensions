@@ -4135,7 +4135,14 @@ function shallowClone2(o) {
     return new Set(o);
   return o;
 }
-var propertyKeyTypes2 = /* @__PURE__ */ new Set(["string", "number", "symbol"]);
+var propertyKeyTypes2 = /* @__PURE__ */ new Set(["string", "number", "symbol"]), primitiveTypes2 = /* @__PURE__ */ new Set([
+  "string",
+  "number",
+  "bigint",
+  "boolean",
+  "symbol",
+  "undefined"
+]);
 function escapeRegex2(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -4800,7 +4807,10 @@ function datetime3(args) {
   let qualified = `${timeSource2({ precision: args.precision, seconds: !0 })}(?:${opts.join("|")})`, timeRegex = args.local ? `${qualified}|${timeSource2({ precision: args.precision })}` : qualified;
   return new RegExp(`^${dateSource2}T(?:${timeRegex})$`);
 }
-var anyString = /^[\s\S]{0,}$/;
+var anyString = /^[\s\S]{0,}$/, string3 = (params) => {
+  let regex = params ? `[\\s\\S]{${params?.minimum ?? 0},${params?.maximum ?? ""}}` : "[\\s\\S]*";
+  return new RegExp(`^${regex}$`);
+};
 var integer2 = /^-?\d+$/, number3 = /^-?\d+(?:\.\d+)?$/, boolean3 = /^(?:true|false)$/i, _null3 = /^null$/i;
 var _undefined3 = /^undefined$/i;
 var lowercase2 = /^[^A-Z]*$/, uppercase2 = /^[^a-z]*$/;
@@ -6388,6 +6398,75 @@ function handleReadonlyResult2(payload) {
     payload.value = Object.freeze(payload.value);
   return payload;
 }
+function leafPattern(schema) {
+  let def = schema._zod.def, pattern = def.pattern, isInt = !!def.format?.includes("int"), minimum, maximum;
+  for (let ch of def.checks ?? []) {
+    let d = ch._zod.def;
+    if (d.pattern)
+      pattern = d.pattern;
+    isInt || (isInt = !!d.format?.includes("int"));
+    let lo = d.minimum ?? d.length, hi = d.maximum ?? d.length;
+    if (lo !== void 0 && (minimum === void 0 || lo > minimum))
+      minimum = lo;
+    if (hi !== void 0 && (maximum === void 0 || hi < maximum))
+      maximum = hi;
+  }
+  if (pattern)
+    return pattern.source;
+  if (minimum !== void 0 && maximum !== void 0 && minimum > maximum)
+    return "(?!)";
+  if (minimum !== void 0 || maximum !== void 0)
+    return string3({ minimum, maximum }).source;
+  let own = schema._zod.pattern;
+  return (isInt && own === number3 ? integer2 : own)?.source;
+}
+function partPattern(schema) {
+  let def = schema._zod.def, own = schema._zod.pattern?.source, inner = def.innerType ?? schema._zod.innerType;
+  if (inner) {
+    let before = inner._zod.pattern?.source, after = partPattern(inner);
+    if (own && before && after && after !== before)
+      return own.replace(cleanRegex2(before), () => cleanRegex2(after));
+    return own;
+  }
+  if (def.options) {
+    let sources = def.options.map(partPattern);
+    if (sources.every(Boolean))
+      return `^(${sources.map((s) => cleanRegex2(s)).join("|")})$`;
+  }
+  return leafPattern(schema);
+}
+var $ZodTemplateLiteral2 = /* @__PURE__ */ $constructor2("$ZodTemplateLiteral", (inst, def) => {
+  $ZodType2.init(inst, def);
+  let regexParts = [];
+  for (let part of def.parts)
+    if (typeof part === "object" && part !== null) {
+      let source = partPattern(part);
+      if (!source)
+        throw Error(`Invalid template literal part, no pattern found: ${[...part._zod.traits].shift()}`);
+      regexParts.push(cleanRegex2(source));
+    } else if (part === null || primitiveTypes2.has(typeof part))
+      regexParts.push(escapeRegex2(`${part}`));
+    else
+      throw Error(`Invalid template literal part: ${part}`);
+  inst._zod.pattern = new RegExp(`^${regexParts.join("")}$`), inst._zod.parse = (payload, _ctx) => {
+    if (typeof payload.value !== "string")
+      return payload.issues.push({
+        input: payload.value,
+        inst,
+        expected: "string",
+        code: "invalid_type"
+      }), payload;
+    if (inst._zod.pattern.lastIndex = 0, !inst._zod.pattern.test(payload.value))
+      return payload.issues.push({
+        input: payload.value,
+        inst,
+        code: "invalid_format",
+        format: def.format ?? "template_literal",
+        pattern: inst._zod.pattern.source
+      }), payload;
+    return payload;
+  };
+});
 var $ZodLazy2 = /* @__PURE__ */ $constructor2("$ZodLazy", (inst, def) => {
   $ZodType2.init(inst, def), defineLazy2(inst._zod, "innerType", () => {
     let d = def;
@@ -7904,6 +7983,11 @@ var enumProcessor2 = (schema, _ctx, json, _params) => {
   }
 }, nanProcessor2 = (schema, ctx, json, params) => {
   handleUnrepresentable(schema, ctx, json, params, "NaN cannot be represented in JSON Schema");
+}, templateLiteralProcessor2 = (schema, _ctx, json, _params) => {
+  let _json = json, pattern = schema._zod.pattern;
+  if (!pattern)
+    throw Error("Pattern not found in template literal");
+  _json.type = "string", _json.pattern = pattern.source;
 };
 var customProcessor2 = (schema, ctx, json, params) => {
   handleUnrepresentable(schema, ctx, json, params, "Custom types cannot be represented in JSON Schema");
@@ -8510,6 +8594,9 @@ var ZodGUID2 = /* @__PURE__ */ $constructor2("ZodGUID", (inst, def) => {
 var ZodUUID2 = /* @__PURE__ */ $constructor2("ZodUUID", (inst, def) => {
   $ZodUUID2.init(inst, def), ZodStringFormat2.init(inst, def);
 });
+function uuid3(params) {
+  return _uuid2(ZodUUID2, params);
+}
 var ZodURL2 = /* @__PURE__ */ $constructor2("ZodURL", (inst, def) => {
   $ZodURL2.init(inst, def), ZodStringFormat2.init(inst, def);
 });
@@ -8967,6 +9054,16 @@ function readonly2(innerType) {
     innerType
   });
 }
+var ZodTemplateLiteral = /* @__PURE__ */ $constructor2("ZodTemplateLiteral", (inst, def) => {
+  $ZodTemplateLiteral2.init(inst, def), ZodType2.init(inst, def), inst._zod.processJSONSchema = (ctx, json, params) => templateLiteralProcessor2(inst, ctx, json, params);
+});
+function templateLiteral(parts, params) {
+  return new ZodTemplateLiteral({
+    type: "template_literal",
+    parts,
+    ...normalizeParams2(params)
+  });
+}
 var ZodLazy = /* @__PURE__ */ $constructor2("ZodLazy", (inst, def) => {
   $ZodLazy2.init(inst, def), ZodType2.init(inst, def), inst._zod.processJSONSchema = (ctx, json, params) => lazyProcessor2(inst, ctx, json, params), inst.unwrap = () => inst._zod.def.getter();
 });
@@ -8984,6 +9081,10 @@ function refine2(fn, _params = {}) {
 }
 function superRefine2(fn, params) {
   return _superRefine2(fn, params);
+}
+function json(params) {
+  let jsonSchema = lazy(() => union2([string4(params), number4(), boolean4(), _null5(), array2(jsonSchema), record(string4(), jsonSchema)]));
+  return jsonSchema;
 }
 // ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/classic/iso.js
 function datetime4(params) {
@@ -10089,20 +10190,6 @@ var RouterResponseSchema = object2({ data: array2(object2({ id: string4().min(1)
       Pending.delete(id);
   }
 };
-// ../models/src/usage.ts
-var BudgetSchema = object2({
-  dailyBudgetCredits: number4().nonnegative(),
-  remainingCredits: number4().nonnegative()
-}), readForgeUsage = async () => {
-  let usage = await (await useForgeClient()).usage().value, budget = BudgetSchema.safeParse(usage?.budget);
-  if (!budget.success)
-    throw Error("Forge returned an invalid balance.");
-  let { remainingCredits: available, dailyBudgetCredits: total } = budget.data;
-  return `Forge daily credits
-Available: ${available.toFixed(2)} credits
-Total: ${total.toFixed(2)} credits`;
-};
-
 // ../../node_modules/.bun/@opencode+plugin@2.1.4+7e97d3cf946b0ea2/node_modules/@opencode/plugin/dist/promise/plugin.js
 function define(plugin) {
   return plugin;
@@ -17666,6 +17753,13 @@ var Updated10 = ephemeral({ type: "reference.updated", schema: {} }), Event14 = 
   hidden: Boolean3.pipe(optional5),
   source: Source3
 }).annotate({ identifier: "Reference.Info" });
+// ../../node_modules/.bun/@opencode+schema@2.1.4/node_modules/@opencode/schema/dist/rpc.js
+function define2(definition) {
+  let reserved = Object.values(definition.methods).flatMap((method) => Object.keys(method.errors ?? {})).find((name) => name.startsWith("rpc."));
+  if (reserved)
+    throw Error(`RPC error names starting with "rpc." are reserved: ${reserved}`);
+  return definition;
+}
 // ../../node_modules/.bun/@opencode+schema@2.1.4/node_modules/@opencode/schema/dist/vcs.js
 var Branch = Struct({
   current: optional5(String5),
@@ -17751,6 +17845,187 @@ var List = ArraySchema(Directory2).annotate({ identifier: "Worktree.List" }), Up
     adopted: optional5(ArraySchema(ID10))
   }
 }), Event16 = { Updated: Updated12, Resolved, Definitions: inventory(Updated12, Resolved) };
+// src/billing-rpc.ts
+var ChargeSchema = union2([
+  literal("personal"),
+  templateLiteral(["project:", uuid3()])
+]), SessionInput = object2({ sessionID: string4() }), BillingRpc = define2({
+  events: {},
+  id: "forge.billing",
+  methods: {
+    choices: {
+      input: SessionInput,
+      output: object2({
+        choices: array2(object2({ description: string4(), label: string4(), target: ChargeSchema })),
+        current: ChargeSchema,
+        sessionID: string4()
+      })
+    },
+    switch: {
+      input: SessionInput.extend({ target: ChargeSchema }),
+      output: _null5()
+    }
+  }
+});
+
+// src/billing.ts
+var MetadataSchema2 = object2({
+  forge: object2({ chargeTo: ChargeSchema.optional() }).optional()
+});
+async function rootSession(ctx, sessionID) {
+  let visited = /* @__PURE__ */ new Set, session = await ctx.session.get({ sessionID });
+  while (session.parentID !== void 0) {
+    if (visited.has(session.id))
+      throw Error("Cannot resolve the billing session: circular parent sessions.");
+    visited.add(session.id), session = await ctx.session.get({ sessionID: session.parentID });
+  }
+  return session;
+}
+function chargeTo(session) {
+  let parsed = MetadataSchema2.safeParse(session.metadata ?? {});
+  if (!parsed.success)
+    throw Error("The session has an invalid Forge billing setting.");
+  return parsed.data.forge?.chargeTo ?? "personal";
+}
+function billingMetadata(session, target) {
+  let previous = record(string4(), json()).catch({}).parse(session.metadata?.forge);
+  return { ...session.metadata, forge: { ...previous, chargeTo: target } };
+}
+async function switchBilling(ctx, forge, sessionID, target) {
+  let next = ChargeSchema.parse(target), session = await rootSession(ctx, sessionID), previous = chargeTo(session);
+  if (previous === next)
+    return;
+  let write = async () => {
+    let fresh = await ctx.session.get({ sessionID: session.id });
+    await ctx.session.update({ metadata: billingMetadata(fresh, next), sessionID: session.id });
+  };
+  if (next === "personal") {
+    if (await write(), previous !== "personal")
+      try {
+        await forge.projectBudget.sessionSwitch({
+          from: previous,
+          projectId: previous.slice(8),
+          sessionId: session.id,
+          to: next
+        });
+      } catch (error) {
+        console.error("[forge] Billing switched to Personal, but recording the switch failed:", error);
+      }
+    return;
+  }
+  let projectId = next.slice(8);
+  await forge.projectBudget.sessionSwitch({
+    from: previous,
+    projectId,
+    sessionId: session.id,
+    to: next
+  });
+  try {
+    await write();
+  } catch (error) {
+    try {
+      await forge.projectBudget.sessionSwitch({
+        from: next,
+        projectId,
+        sessionId: session.id,
+        to: previous
+      });
+    } catch (rollbackError) {
+      console.error("[forge] Could not record the billing rollback:", rollbackError);
+    }
+    throw error;
+  }
+}
+async function billingRequest(request, providerID, target, title) {
+  if (providerID === "forge") {
+    let headers = new Headers(request.headers);
+    return headers.set("x-forge-charge-to", target), headers.set("x-forge-session-title", encodeURIComponent(title.slice(0, 200))), new Request(request, { headers });
+  }
+  let body = record(string4(), unknown2()).parse(await request.clone().json()), usage = record(string4(), unknown2()).parse(body.forge_usage ?? {});
+  body.forge_usage = { ...usage, chargeTo: target, sessionTitle: title.slice(0, 200) };
+  let headers = new Headers(request.headers);
+  return headers.delete("content-length"), new Request(request, { body: JSON.stringify(body), headers, method: request.method });
+}
+async function billingAccount(ctx, forge, sessionID) {
+  let root = await rootSession(ctx, sessionID), target = chargeTo(root);
+  if (target === "personal") {
+    let usage = await forge.usage().value;
+    return {
+      available: usage.budget.remainingUsd,
+      name: "Personal",
+      total: usage.budget.dailyBudgetUsd
+    };
+  }
+  let project = await forge.projectBudget.state(target.slice(8));
+  return { available: project.remainingUsd, name: project.title, total: void 0 };
+}
+function usageMessage(account) {
+  let amount = `$${account.available.toFixed(2)}`;
+  return `Forge Billing: ${account.name}
+${account.total === void 0 ? `${amount} left` : `${amount} of $${account.total.toFixed(2)} left`}`;
+}
+async function billingNotice(ctx, sessionID, description) {
+  await ctx.session.synthetic({
+    description,
+    metadata: { forgeBillingNotice: !0 },
+    resume: !1,
+    sessionID,
+    text: description
+  });
+}
+async function registerBilling(ctx, connect = useForgeClient) {
+  await ctx.rpc.register(BillingRpc, {
+    choices: async ({ sessionID }) => {
+      let root = await rootSession(ctx, sessionID), forge = await connect(), [context, usage] = await Promise.all([
+        forge.projectBudget.chargeContext(root.location.directory),
+        forge.usage().value
+      ]), projects = context.enabled ? context.projects.filter((project) => project.canCharge && project.status === "active") : [];
+      return {
+        choices: [
+          {
+            description: `$${usage.budget.remainingUsd.toFixed(2)} available`,
+            label: "Personal Budget",
+            target: "personal"
+          },
+          ...projects.map((project) => ({
+            description: `$${project.remainingUsd.toFixed(2)} available`,
+            label: projects.filter((candidate) => candidate.title === project.title).length > 1 ? `${project.title} (${project.projectId})` : project.title,
+            target: ChargeSchema.parse(`project:${project.projectId}`)
+          }))
+        ],
+        current: chargeTo(root),
+        sessionID: root.id
+      };
+    },
+    switch: async ({ sessionID, target }) => {
+      let root = await rootSession(ctx, sessionID), previous = chargeTo(root);
+      if (previous === target)
+        return null;
+      let forge = await connect(), previousName = "Personal";
+      if (previous !== "personal")
+        try {
+          previousName = (await forge.projectBudget.state(previous.slice(8))).title;
+        } catch {
+          previousName = previous;
+        }
+      await switchBilling(ctx, forge, root.id, target);
+      let account = await billingAccount(ctx, forge, root.id);
+      return await billingNotice(ctx, root.id, `Forge Billing: ${previousName} → ${account.name}
+$${account.available.toFixed(2)} left`), null;
+    }
+  });
+  for (let kind of ["context", "compaction", "generate", "title"])
+    await ctx.session.hook(kind, async (event) => {
+      let history = await ctx.session.context({ sessionID: event.sessionID }), notices = new Set(history.filter((message) => message.metadata?.forgeBillingNotice === !0).map((message) => message.id));
+      event.messages = event.messages.filter((message) => message.id === void 0 || !notices.has(message.id));
+    });
+  for (let providerID of ["forge", "forge-router"])
+    await ctx.session.hook("http.request", async (event) => {
+      let root = await rootSession(ctx, event.sessionID);
+      event.request = await billingRequest(event.request, providerID, chargeTo(root), root.title ?? "");
+    }, { providerID });
+}
+
 // src/model-builder.ts
 var price2 = (value) => USDPerMillionTokens.make(value), costEntry = (cost, tier) => {
   let entry = {
@@ -17957,21 +18232,21 @@ var serverFile = path5.join(homedir4(), ".forge", "server.json"), ROUTER_ID = "f
       console.error(`[forge] Could not watch ${serverFile}: ${message(error)}`);
     }
     let controller = new AbortController;
-    if ((async () => {
+    if (await registerBilling(ctx), (async () => {
       for await (let event of ctx.event.subscribe({ signal: controller.signal }))
         if (event.type === "integration.updated" || event.type === "credential.updated" || event.type === "credential.switched")
           await refreshRouter().catch(reportRouterError);
     })().catch(reportEventError), await ctx.command.transform((editor) => {
       editor.add({
-        description: "Show available and total Forge daily credits",
+        description: "Show the current Forge billing account and available budget",
         execute: async ({ sessionID }) => {
           let text;
           try {
-            text = await readForgeUsage();
+            text = usageMessage(await billingAccount(ctx, await useForgeClient(), sessionID));
           } catch {
             text = "Forge balance unavailable. Start Forge Desktop and wait for its usage snapshot, then run /forge:usage again.";
           }
-          await ctx.session.synthetic({ description: text, resume: !1, sessionID, text });
+          await billingNotice(ctx, sessionID, text);
         },
         name: "forge:usage"
       }), editor.add({
@@ -18007,25 +18282,25 @@ export {
 // Third-party licenses
 // @opencode/plugin@2.1.4
 // License: MIT (package contains no LICENSE file)
-// 
+//
 // @opencode/schema@2.1.4
 // License: MIT (package contains no LICENSE file)
-// 
+//
 // effect@4.0.1
 // MIT License
-// 
+//
 // Copyright (c) 2023 Effectful Technologies Inc
-// 
+//
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
 // in the Software without restriction, including without limitation the rights
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be included in all
 // copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -18033,33 +18308,33 @@ export {
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-// 
+//
 // env-paths@4.0.0
 // MIT License
-// 
+//
 // Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)
-// 
+//
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-// 
+//
 // eventsource-parser@3.0.8
 // MIT License
-// 
+//
 // Copyright (c) 2026 Espen Hovlandsdal <espen@hovlandsdal.com>
-// 
+//
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
 // in the Software without restriction, including without limitation the rights
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be included in all
 // copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -18067,22 +18342,22 @@ export {
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-// 
+//
 // hono@4.12.14
 // MIT License
-// 
+//
 // Copyright (c) 2021 - present, Yusuke Wada and Hono contributors
-// 
+//
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
 // in the Software without restriction, including without limitation the rights
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be included in all
 // copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -18090,33 +18365,33 @@ export {
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-// 
+//
 // is-safe-filename@0.1.1
 // MIT License
-// 
+//
 // Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)
-// 
+//
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-// 
+//
 // unstorage@2.0.0-beta.0
 // MIT License
-// 
+//
 // Copyright (c) Pooya Parsa <pooya@pi0.io>
-// 
+//
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
 // in the Software without restriction, including without limitation the rights
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be included in all
 // copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -18124,22 +18399,22 @@ export {
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-// 
+//
 // zod@4.3.6
 // MIT License
-// 
+//
 // Copyright (c) 2025 Colin McDonnell
-// 
+//
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
 // in the Software without restriction, including without limitation the rights
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be included in all
 // copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -18147,22 +18422,22 @@ export {
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-// 
+//
 // zod@4.6.7
 // MIT License
-// 
+//
 // Copyright (c) 2025 Colin McDonnell
-// 
+//
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
 // in the Software without restriction, including without limitation the rights
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be included in all
 // copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
