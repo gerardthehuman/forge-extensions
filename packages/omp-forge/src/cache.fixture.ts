@@ -37,7 +37,13 @@ await mock.module("@forge/code-client", () => ({
 
     return {
       mcp: {
-        servers: async () => await Promise.resolve({ forge: { url: "http://localhost:9999/mcp" } }),
+        servers: async () =>
+          await Promise.resolve({
+            forge: {
+              headers: { Authorization: "Bearer fixture-mcp" },
+              url: "http://localhost:9999/mcp?providers=example&writes=1",
+            },
+          }),
       },
       models: async () =>
         await Promise.resolve(
@@ -126,6 +132,8 @@ const context = {
 let refresh: (() => Promise<void>) | undefined;
 let cleanup: (() => void) | undefined;
 let ms = 0;
+let mcpUrl: string | undefined;
+let mcpHeaders: Record<string, string> | undefined;
 
 if (host === "omp") {
   const { default: plugin } = await import("./index.ts");
@@ -180,6 +188,12 @@ if (host === "omp") {
 } else {
   const { default: plugin } = await import("../../opencode-forge/index.ts");
 
+  interface McpEditor {
+    set: (name: string, config: { url: string; headers?: Record<string, string> }) => void;
+  }
+
+  let mcpTransform: ((editor: McpEditor) => void) | undefined;
+
   let transform:
     | ((editor: {
         add: (provider: { info: { id: string }; models: Inventory["models"] }) => void;
@@ -225,9 +239,20 @@ if (host === "omp") {
     },
     mcp: {
       reload: async () => {
+        mcpTransform?.({
+          set: (name, config) => {
+            if (name !== "forge") {
+              throw new Error("Unexpected MCP server changed");
+            }
+
+            mcpUrl = config.url;
+            mcpHeaders = config.headers;
+          },
+        });
         await Promise.resolve();
       },
-      transform: async () => {
+      transform: async (edit: NonNullable<typeof mcpTransform>) => {
+        mcpTransform = edit;
         await Promise.resolve();
       },
     },
@@ -295,6 +320,8 @@ try {
       failureReported,
       initialDesktop,
       initialRouter,
+      mcpHeaders,
+      mcpUrl,
       ms,
       reloads,
       retained,

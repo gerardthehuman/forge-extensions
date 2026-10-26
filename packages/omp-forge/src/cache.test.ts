@@ -8,6 +8,8 @@ const ResultSchema = z.object({
   failureReported: z.boolean(),
   initialDesktop: z.string(),
   initialRouter: z.string(),
+  mcpHeaders: z.record(z.string(), z.string()).optional(),
+  mcpUrl: z.string().optional(),
   ms: z.number(),
   reloads: z.number(),
   retained: z.boolean(),
@@ -50,6 +52,14 @@ for (const host of ["omp", "opencode"]) {
       expect(result.failureReported).toBe(true);
       expect(result.cleared).toBe(true);
       expect(result.reloads).toBeGreaterThan(0);
+
+      if (host === "opencode") {
+        const url = new URL(z.string().parse(result.mcpUrl));
+        expect(url.searchParams.get("skills")).toBe(",");
+        expect(url.searchParams.get("providers")).toBe("example");
+        expect(url.searchParams.get("writes")).toBe("1");
+        expect(result.mcpHeaders).toEqual({ Authorization: "Bearer fixture-mcp" });
+      }
     } finally {
       clearTimeout(timeout);
     }

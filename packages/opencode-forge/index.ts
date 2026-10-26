@@ -157,7 +157,10 @@ export default Plugin.define({
     const refreshMcp = async () => {
       const forge = await useForgeClient();
       const mcp = await forge.mcp.servers();
-      state.forgeMcp = { headers: mcp.forge.headers, url: mcp.forge.url };
+      const url = new URL(mcp.forge.url);
+      // An empty skills value allows all skills; an empty CSV list selects none.
+      url.searchParams.set("skills", ",");
+      state.forgeMcp = { headers: mcp.forge.headers, url: url.href };
       await ctx.mcp.reload();
     };
 

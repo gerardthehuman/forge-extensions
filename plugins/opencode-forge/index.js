@@ -17902,8 +17902,8 @@ var serverFile = path5.join(homedir4(), ".forge", "server.json"), ROUTER_ID = "f
         console.error("[forge] Forge is unavailable; cached models retained.");
       }
     }, refreshMcp = async () => {
-      let mcp = await (await useForgeClient()).mcp.servers();
-      state.forgeMcp = { headers: mcp.forge.headers, url: mcp.forge.url }, await ctx.mcp.reload();
+      let mcp = await (await useForgeClient()).mcp.servers(), url = new URL(mcp.forge.url);
+      url.searchParams.set("skills", ","), state.forgeMcp = { headers: mcp.forge.headers, url: url.href }, await ctx.mcp.reload();
     }, loadRouter = async (force) => {
       let connection = await ctx.integration.connection.active(ROUTER_ID), key = routerKey(connection ? await ctx.integration.connection.resolve(connection) : void 0);
       if (key === void 0 || key === "") {
