@@ -1,6 +1,6 @@
 {
   "name": "@forge/omp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Forge Desktop models and MCP tools, plus Forge Router access for OMP",
   "type": "module",

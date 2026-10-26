@@ -29,7 +29,7 @@
     },
     "packages/omp-forge": {
       "name": "@forge/omp",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "dependencies": {
         "@forge/code-client": "file:../../vendor/forge-client.tgz",
         "@forge/models": "workspace:*",
@@ -45,7 +45,7 @@
     },
     "packages/opencode-forge": {
       "name": "@forge/opencode",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "dependencies": {
         "@forge/code-client": "file:../../vendor/forge-client.tgz",
         "@forge/models": "workspace:*",
