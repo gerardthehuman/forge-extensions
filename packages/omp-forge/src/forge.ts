@@ -6,15 +6,6 @@ const BudgetSchema = z.object({
   remainingCredits: z.number().nonnegative(),
 });
 
-/**
- * Budget days are local midnights on the Forge side, so `/models` must carry
- * this machine's IANA timezone. Without it the broker falls back to a UTC day
- * and filters the catalog down to $-band models whenever that day is over
- * budget.
- */
-export const localTimezone = (): string =>
-  Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-
 export const readForgeUsage = async (): Promise<string> => {
   const forge = await useForgeClient();
   const usage = await forge.usage().value;

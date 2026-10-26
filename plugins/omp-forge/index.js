@@ -1,3 +1,36 @@
+var __defProp = Object.defineProperty;
+var __returnValue = (v) => v;
+function __exportSetter(name, newValue) {
+  this[name] = __returnValue.bind(null, newValue);
+}
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, {
+      get: all[name],
+      enumerable: !0,
+      configurable: !0,
+      set: __exportSetter.bind(all, name)
+    });
+};
+
+// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/classic/iso.js
+var exports_iso2 = {};
+__export(exports_iso2, {
+  ZodISODate: () => ZodISODate2,
+  ZodISODateTime: () => ZodISODateTime2,
+  ZodISODuration: () => ZodISODuration2,
+  ZodISOTime: () => ZodISOTime2,
+  date: () => date4,
+  datetime: () => datetime4,
+  duration: () => duration4,
+  time: () => time4
+});
+
+// ../models/src/desktop-catalog.ts
+import { readFile as readFile3 } from "node:fs/promises";
+import { homedir as homedir3 } from "node:os";
+import path3 from "node:path";
+
 // ../../node_modules/.bun/zod@4.3.6/node_modules/zod/v4/core/core.js
 var NEVER = Object.freeze({
   status: "aborted"
@@ -3925,7 +3958,7 @@ async function useForgeClient(options = {}) {
   return forge;
 }
 
-// node_modules/zod/v4/core/util.js
+// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/util.js
 function getEnumValues2(entries) {
   let numericValues = Object.values(entries).filter((v) => typeof v === "number");
   return Object.entries(entries).filter(([k, _]) => numericValues.indexOf(+k) === -1).map(([_, v]) => v);
@@ -3965,6 +3998,25 @@ function floatSafeRemainder2(val, step) {
   if (Math.abs(ratio - roundedRatio) < tolerance)
     return 0;
   return ratio - roundedRatio;
+}
+var EVALUATING2 = /* @__PURE__ */ Symbol("evaluating");
+function defineLazy2(object, key, getter) {
+  let value = void 0;
+  Object.defineProperty(object, key, {
+    get() {
+      if (value === EVALUATING2)
+        return;
+      if (value === void 0)
+        value = EVALUATING2, value = getter();
+      return value;
+    },
+    set(v) {
+      Object.defineProperty(object, key, {
+        value: v
+      });
+    },
+    configurable: !0
+  });
 }
 function assignProp2(target, prop, value) {
   Object.defineProperty(target, prop, {
@@ -4220,6 +4272,18 @@ function prefixIssues2(path, issues) {
 function unwrapMessage2(message) {
   return typeof message === "string" ? message : message?.message;
 }
+function sizeCaps(defChecks) {
+  let caps = [];
+  for (let ch of defChecks ?? []) {
+    let d = ch._zod.def;
+    if (!/_(length|size)$|_equals$/.test(d.check))
+      break;
+    let max = d.maximum ?? d.length ?? d.size;
+    if (max >= 0)
+      caps.push([max, ch]);
+  }
+  return caps;
+}
 function attachSchema(issues, start, inst) {
   var _a;
   for (let i = start;i < issues.length; i++)
@@ -4391,10 +4455,9 @@ function constantCatch(value) {
   return fn[CONSTANT_CATCH] = !0, fn;
 }
 
-// node_modules/zod/v4/core/core.js
-var _a2, NEVER2 = /* @__PURE__ */ Object.freeze({
-  status: "aborted"
-}), _zodDesc = { value: void 0, enumerable: !1 }, _E = "captureStackTrace" in Error ? Error : null;
+// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/core.js
+var _a2;
+var _zodDesc = { value: void 0, enumerable: !1 }, _E = "captureStackTrace" in Error ? Error : null;
 function newError(Definition) {
   let E = _E;
   if (E) {
@@ -4493,7 +4556,7 @@ function config2(newConfig) {
     Object.assign(globalConfig2, newConfig);
   return globalConfig2;
 }
-// node_modules/zod/v4/core/errors.js
+// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/errors.js
 function _getMessage() {
   let internals = this._zod;
   return internals.message ?? (internals.message = JSON.stringify(internals.def, jsonStringifyReplacer2, 2)), internals.message;
@@ -4582,7 +4645,7 @@ function formatError2(error, mapper = (issue) => issue.message) {
   return processError(error), fieldErrors;
 }
 
-// node_modules/zod/v4/core/parse.js
+// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/parse.js
 function finalizeParams(callee, params) {
   return { callee: params?.callee ?? callee, Err: params?.Err };
 }
@@ -4695,7 +4758,7 @@ var _safeEncodeAsync2 = (_Err) => async (schema, value, _ctx) => {
   return _safeParseAsync2(_Err)(schema, value, ctx);
 };
 var _safeDecodeAsync2 = (_Err) => async (schema, value, _ctx) => _safeParseAsync2(_Err)(schema, value, _ctx);
-// node_modules/zod/v4/core/regexes.js
+// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/regexes.js
 var cuid3 = /^[cC][0-9a-z]{6,}$/, cuid22 = /^[0-9a-z]+$/, ulid2 = /^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$/, xid2 = /^[0-9a-vA-V]{20}$/, ksuid2 = /^[A-Za-z0-9]{27}$/, nanoid2 = /^[a-zA-Z0-9_-]{21}$/;
 function nanoidOfLength(length) {
   return new RegExp(`^[a-zA-Z0-9_-]{${length}}$`);
@@ -4733,10 +4796,11 @@ function datetime3(args) {
   return new RegExp(`^${dateSource2}T(?:${timeRegex})$`);
 }
 var anyString = /^[\s\S]{0,}$/;
-var integer2 = /^-?\d+$/, number3 = /^-?\d+(?:\.\d+)?$/;
+var integer2 = /^-?\d+$/, number3 = /^-?\d+(?:\.\d+)?$/, boolean3 = /^(?:true|false)$/i, _null3 = /^null$/i;
+var _undefined3 = /^undefined$/i;
 var lowercase2 = /^[^A-Z]*$/, uppercase2 = /^[^a-z]*$/;
 
-// node_modules/zod/v4/core/checks.js
+// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/checks.js
 var $ZodCheck2 = /* @__PURE__ */ $constructor2("$ZodCheck", (inst, def) => {
   var _a;
   inst._zod ?? (inst._zod = {}), inst._zod.def = def, (_a = inst._zod).onattach ?? (_a.onattach = []);
@@ -5002,7 +5066,7 @@ var $ZodCheckOverwrite2 = /* @__PURE__ */ $constructor2("$ZodCheckOverwrite", (i
   };
 });
 
-// node_modules/zod/v4/core/doc.js
+// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/doc.js
 class Doc2 {
   constructor(args = [], closed = {}) {
     this.content = [], this.indent = 0, this.args = args, this.closed = closed;
@@ -5034,14 +5098,14 @@ ${content.join(`
   }
 }
 
-// node_modules/zod/v4/core/versions.js
+// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/versions.js
 var version2 = {
   major: 4,
   minor: 6,
-  patch: 5
+  patch: 7
 };
 
-// node_modules/zod/v4/core/schemas.js
+// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/schemas.js
 var $ZodType2 = /* @__PURE__ */ $constructor2("$ZodType", (inst, def) => {
   var _a;
   inst ?? (inst = {}), inst._zod.def = def, inst._zod.bag = inst._zod.bag || {}, inst._zod.version = version2;
@@ -5454,6 +5518,47 @@ var $ZodNumber2 = /* @__PURE__ */ $constructor2("$ZodNumber", (inst, def) => {
   };
 }), $ZodNumberFormat2 = /* @__PURE__ */ $constructor2("$ZodNumberFormat", (inst, def) => {
   $ZodCheckNumberFormat2.init(inst, def), $ZodNumber2.init(inst, def);
+}), $ZodBoolean2 = /* @__PURE__ */ $constructor2("$ZodBoolean", (inst, def) => {
+  $ZodType2.init(inst, def), inst._zod.pattern = boolean3, inst._zod.parse = (payload, _ctx) => {
+    if (def.coerce)
+      try {
+        payload.value = Boolean(payload.value);
+      } catch (_) {}
+    let input = payload.value;
+    if (typeof input === "boolean")
+      return payload;
+    return payload.issues.push({
+      expected: "boolean",
+      code: "invalid_type",
+      input,
+      inst
+    }), payload;
+  };
+});
+var $ZodUndefined2 = /* @__PURE__ */ $constructor2("$ZodUndefined", (inst, def) => {
+  $ZodType2.init(inst, def), inst._zod.pattern = _undefined3, inst._zod.values = /* @__PURE__ */ new Set([void 0]), inst._zod.parse = (payload, _ctx) => {
+    let input = payload.value;
+    if (typeof input > "u")
+      return payload;
+    return payload.issues.push({
+      expected: "undefined",
+      code: "invalid_type",
+      input,
+      inst
+    }), payload;
+  };
+}), $ZodNull2 = /* @__PURE__ */ $constructor2("$ZodNull", (inst, def) => {
+  $ZodType2.init(inst, def), inst._zod.pattern = _null3, inst._zod.values = /* @__PURE__ */ new Set([null]), inst._zod.parse = (payload, _ctx) => {
+    let input = payload.value;
+    if (input === null)
+      return payload;
+    return payload.issues.push({
+      expected: "null",
+      code: "invalid_type",
+      input,
+      inst
+    }), payload;
+  };
 });
 var $ZodUnknown2 = /* @__PURE__ */ $constructor2("$ZodUnknown", (inst, def) => {
   $ZodType2.init(inst, def), inst._zod.parse = (payload) => payload;
@@ -5465,6 +5570,24 @@ var $ZodUnknown2 = /* @__PURE__ */ $constructor2("$ZodUnknown", (inst, def) => {
     inst
   }), payload);
 });
+function capSize(inst, size) {
+  let caps = sizeCaps(inst._zod.def.checks);
+  if (!caps.length)
+    return;
+  let cap = Math.min(...caps.map((c) => c[0])), parse = inst._zod.parse;
+  inst._zod.parse = (payload, ctx) => {
+    let n = size(payload.value);
+    if (n > cap && !ctx?.skipChecks && ctx?.direction !== "backward") {
+      for (let [max, ch] of sizeCaps(inst._zod.def.checks))
+        if (n > max && ch._zod.def.when(payload)) {
+          let start = payload.issues.length;
+          return ch._zod.check(payload), payload.issues[start].continue = !1, attachSchema(payload.issues, start, inst), payload;
+        }
+    }
+    return parse(payload, ctx);
+  };
+}
+var arraySize = (input) => Array.isArray(input) ? input.length : -1;
 function handleArrayResult2(result, final, index) {
   if (result.issues.length)
     final.issues.push(...prefixIssues2(index, result.issues));
@@ -5497,7 +5620,7 @@ var $ZodArray2 = /* @__PURE__ */ $constructor2("$ZodArray", (inst, def) => {
     if (proms.length)
       return Promise.all(proms).then(() => payload);
     return payload;
-  };
+  }, capSize(inst, arraySize);
 });
 function handlePropertyResult2(result, final, key, input, optin, optout) {
   let isPresent = key in input, isOptionalOut = optout === "optional";
@@ -5778,7 +5901,75 @@ var $ZodUnion2 = /* @__PURE__ */ $constructor2("$ZodUnion", (inst, def) => {
     return Promise.all(results).then((results) => handleUnionResults2(results, payload, inst, ctx));
   };
 });
-var $ZodIntersection2 = /* @__PURE__ */ $constructor2("$ZodIntersection", (inst, def) => {
+function discriminatorMap(def) {
+  let map = /* @__PURE__ */ new Map;
+  for (let option of def.options) {
+    let values = option._zod.propValues?.[def.discriminator];
+    if (!values || values.size === 0)
+      throw Error(`Invalid discriminated union option at index "${def.options.indexOf(option)}"`);
+    for (let value of values)
+      if (map.has(value)) {
+        if (value !== void 0)
+          throw Error(`Duplicate discriminator value "${String(value)}"`);
+        map.set(value, null);
+      } else
+        map.set(value, option);
+  }
+  return map;
+}
+var $ZodDiscriminatedUnion2 = /* @__PURE__ */ $constructor2("$ZodDiscriminatedUnion", (inst, def) => {
+  def.inclusive = !1, $ZodUnion2.init(inst, def);
+  let _super = inst._zod.parse;
+  defineLazyInternal(inst, "propValues", (zod) => {
+    let propValues = {}, undefinedCount = 0;
+    for (let option of zod.def.options) {
+      let pv = option._zod.propValues;
+      if (!pv || Object.keys(pv).length === 0)
+        throw Error(`Invalid discriminated union option at index "${zod.def.options.indexOf(option)}"`);
+      if (pv[zod.def.discriminator]?.has(void 0))
+        undefinedCount++;
+      for (let [k, v] of Object.entries(pv)) {
+        if (!Object.prototype.hasOwnProperty.call(propValues, k))
+          assignProp2(propValues, k, /* @__PURE__ */ new Set);
+        for (let val of v)
+          propValues[k].add(val);
+      }
+    }
+    if (!zod.def.unionFallback && undefinedCount > 1)
+      propValues[zod.def.discriminator]?.delete(void 0);
+    return propValues;
+  }), def.options.forEach((option, i) => {
+    let propShape = rawShape(option._zod.def);
+    if (propShape && !Object.prototype.hasOwnProperty.call(propShape, def.discriminator))
+      throw Error(`Invalid discriminated union option at index "${i}"`);
+  });
+  let disc = cached2(() => discriminatorMap(def));
+  inst._zod.parse = (payload, ctx) => {
+    let input = payload.value;
+    if (!isObject3(input))
+      return payload.issues.push({
+        code: "invalid_type",
+        expected: "object",
+        input,
+        inst
+      }), payload;
+    let value = input?.[def.discriminator], opt = disc.value.get(value);
+    if (opt && (value !== void 0 || ctx.direction !== "backward"))
+      return opt._zod.run(payload, ctx);
+    if (def.unionFallback || ctx.direction === "backward")
+      return _super(payload, ctx);
+    return payload.issues.push({
+      code: "invalid_union",
+      errors: [],
+      note: "No matching discriminator",
+      discriminator: def.discriminator,
+      options: Array.from(disc.value.keys()).filter((value) => disc.value.get(value) !== null),
+      input,
+      path: [def.discriminator],
+      inst
+    }), payload;
+  };
+}), $ZodIntersection2 = /* @__PURE__ */ $constructor2("$ZodIntersection", (inst, def) => {
   $ZodType2.init(inst, def), inst._zod.parse = (payload, ctx) => {
     let input = payload.value, left = def.left._zod.run({ value: input, issues: [] }, ctx), right = def.right._zod.run({ value: input, issues: [] }, ctx);
     if (left instanceof Promise || right instanceof Promise)
@@ -6147,8 +6338,18 @@ var $ZodCatch2 = /* @__PURE__ */ $constructor2("$ZodCatch", (inst, def) => {
       return result.then((result) => handleCatchResult(payload, result, def, ctx));
     return handleCatchResult(payload, result, def, ctx);
   };
-});
-var $ZodPipe2 = /* @__PURE__ */ $constructor2("$ZodPipe", (inst, def) => {
+}), $ZodNaN2 = /* @__PURE__ */ $constructor2("$ZodNaN", (inst, def) => {
+  $ZodType2.init(inst, def), inst._zod.parse = (payload, _ctx) => {
+    if (typeof payload.value !== "number" || !Number.isNaN(payload.value))
+      return payload.issues.push({
+        input: payload.value,
+        inst,
+        expected: "nan",
+        code: "invalid_type"
+      }), payload;
+    return payload;
+  };
+}), $ZodPipe2 = /* @__PURE__ */ $constructor2("$ZodPipe", (inst, def) => {
   $ZodType2.init(inst, def), defineLazyInternal(inst, "values", (zod) => zod.def.in._zod.values), defineLazyInternal(inst, "optin", (zod) => zod.def.in._zod.optin), defineLazyInternal(inst, "optout", (zod) => zod.def.out._zod.optout), defineLazyInternal(inst, "propValues", (zod) => zod.def.in._zod.propValues), inst._zod.parse = (payload, ctx) => {
     if (ctx.direction === "backward") {
       let right = def.out._zod.run(payload, ctx);
@@ -6182,7 +6383,14 @@ function handleReadonlyResult2(payload) {
     payload.value = Object.freeze(payload.value);
   return payload;
 }
-var $ZodCustom2 = /* @__PURE__ */ $constructor2("$ZodCustom", (inst, def) => {
+var $ZodLazy2 = /* @__PURE__ */ $constructor2("$ZodLazy", (inst, def) => {
+  $ZodType2.init(inst, def), defineLazy2(inst._zod, "innerType", () => {
+    let d = def;
+    if (!d._cachedInner)
+      d._cachedInner = def.getter();
+    return d._cachedInner;
+  }), defineLazyInternal(inst, "pattern", (zod) => zod.innerType?._zod?.pattern), defineLazyInternal(inst, "propValues", (zod) => zod.innerType?._zod?.propValues), defineLazyInternal(inst, "optin", (zod) => zod.innerType?._zod?.optin ?? void 0), defineLazyInternal(inst, "optout", (zod) => zod.innerType?._zod?.optout ?? void 0), inst._zod.parse = (payload, ctx) => inst._zod.innerType._zod.run(payload, ctx);
+}), $ZodCustom2 = /* @__PURE__ */ $constructor2("$ZodCustom", (inst, def) => {
   $ZodCheck2.init(inst, def), $ZodType2.init(inst, def), inst._zod.parse = (payload, _) => payload, inst._zod.check = (payload) => {
     let input = payload.value, r = def.fn(input);
     if (r instanceof Promise)
@@ -6205,7 +6413,7 @@ function handleRefineResult2(result, payload, input, inst) {
     payload.issues.push(issue2(_iss));
   }
 }
-// node_modules/zod/v4/core/memoizer.js
+// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/memoizer.js
 class $ZodCyclicError extends Error {
   constructor() {
     super("Cannot parse a reference cycle that closes through a transform");
@@ -6431,7 +6639,7 @@ function isBackEdge(ctx, value) {
   let backEdges = ctx[STATE]?.backEdges;
   return backEdges !== void 0 && isRef(value) && backEdges.has(value);
 }
-// node_modules/zod/v4/locales/en.js
+// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/locales/en.js
 var error = () => {
   let Sizable = {
     string: { unit: "characters", verb: "to have" },
@@ -6542,7 +6750,7 @@ function en_default() {
     localeError: error()
   };
 }
-// node_modules/zod/v4/core/registries.js
+// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/registries.js
 var _a3;
 class $ZodRegistry2 {
   constructor() {
@@ -6582,7 +6790,7 @@ function registry2() {
 }
 (_a3 = globalThis).__zod_globalRegistry ?? (_a3.__zod_globalRegistry = registry2());
 var globalRegistry2 = globalThis.__zod_globalRegistry;
-// node_modules/zod/v4/core/api.js
+// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/api.js
 function snapshotChecks(def) {
   if (def.checks)
     def.checks = [...def.checks];
@@ -6840,6 +7048,24 @@ function _int2(Class, params) {
     ...normalizeParams2(params)
   });
 }
+function _boolean2(Class, params) {
+  return new Class({
+    type: "boolean",
+    ...normalizeParams2(params)
+  });
+}
+function _undefined4(Class, params) {
+  return new Class({
+    type: "undefined",
+    ...normalizeParams2(params)
+  });
+}
+function _null4(Class, params) {
+  return new Class({
+    type: "null",
+    ...normalizeParams2(params)
+  });
+}
 function _unknown2(Class) {
   return new Class({
     type: "unknown"
@@ -6848,6 +7074,12 @@ function _unknown2(Class) {
 function _never2(Class, params) {
   return new Class({
     type: "never",
+    ...normalizeParams2(params)
+  });
+}
+function _nan2(Class, params) {
+  return new Class({
+    type: "nan",
     ...normalizeParams2(params)
   });
 }
@@ -7015,7 +7247,7 @@ function _check2(fn, params) {
   });
   return ch._zod.check = fn, ch;
 }
-// node_modules/zod/v4/core/to-json-schema.js
+// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/to-json-schema.js
 function assignProps(target, ...sources) {
   for (let source of sources)
     for (let key of Reflect.ownKeys(source))
@@ -7465,7 +7697,7 @@ var createToJSONSchemaMethod2 = (schema, processors = {}) => (params) => {
   let { libraryOptions, target } = params ?? {}, ctx = initializeContext2({ ...libraryOptions ?? {}, target, io, processors });
   return processSchema(schema, ctx), extractDefs2(ctx, schema), finalize2(ctx, schema);
 };
-// node_modules/zod/v4/core/json-schema-processors.js
+// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/json-schema-processors.js
 var narrowMin = (agg, key, value) => {
   if (agg[key] === void 0 || value > agg[key])
     agg[key] = value;
@@ -7603,6 +7835,16 @@ var formatMap2 = {
     if (rest.length)
       json.allOf = [...json.allOf ?? [], ...rest.map((m) => ({ multipleOf: m }))];
   }
+}, booleanProcessor2 = (_schema, _ctx, json, _params) => {
+  json.type = "boolean";
+};
+var nullProcessor2 = (_schema, ctx, json, _params) => {
+  if (ctx.target === "openapi-3.0")
+    json.type = "string", json.nullable = !0, json.enum = [null];
+  else
+    json.type = "null";
+}, undefinedProcessor2 = (schema, ctx, json, params) => {
+  handleUnrepresentable(schema, ctx, json, params, "Undefined cannot be represented in JSON Schema");
 };
 var neverProcessor2 = (_schema, _ctx, json, _params) => {
   json.not = {};
@@ -7655,6 +7897,8 @@ var enumProcessor2 = (schema, _ctx, json, _params) => {
       json.type = "null";
     json.enum = vals;
   }
+}, nanProcessor2 = (schema, ctx, json, params) => {
+  handleUnrepresentable(schema, ctx, json, params, "NaN cannot be represented in JSON Schema");
 };
 var customProcessor2 = (schema, ctx, json, params) => {
   handleUnrepresentable(schema, ctx, json, params, "Custom types cannot be represented in JSON Schema");
@@ -7890,8 +8134,13 @@ var optionalProcessor2 = (schema, ctx, _json, params) => {
   processSchema(def.innerType, ctx, params);
   let seen = ctx.seen.get(schema);
   seen.ref = def.innerType;
+}, lazyProcessor2 = (schema, ctx, _json, params) => {
+  let innerType = schema._zod.innerType;
+  processSchema(innerType, ctx, params);
+  let seen = ctx.seen.get(schema);
+  seen.ref = innerType;
 };
-// node_modules/zod/v4/classic/errors.js
+// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/classic/errors.js
 var _installedErrorProtos = /* @__PURE__ */ new WeakSet([Object.prototype, Error.prototype]);
 function _lazyMethod(proto, key, make) {
   Object.defineProperty(proto, key, {
@@ -7927,10 +8176,10 @@ var ZodRealError2 = /* @__PURE__ */ $constructor2("ZodError", initializer4, void
   Parent: Error
 });
 
-// node_modules/zod/v4/classic/parse.js
+// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/classic/parse.js
 var parse5 = /* @__PURE__ */ _parse2(ZodRealError2), parseAsync3 = /* @__PURE__ */ _parseAsync2(ZodRealError2), safeParse3 = /* @__PURE__ */ _safeParse2(ZodRealError2), safeParseAsync3 = /* @__PURE__ */ _safeParseAsync2(ZodRealError2), encode2 = /* @__PURE__ */ _encode2(ZodRealError2), decode2 = /* @__PURE__ */ _decode2(ZodRealError2), encodeAsync2 = /* @__PURE__ */ _encodeAsync2(ZodRealError2), decodeAsync2 = /* @__PURE__ */ _decodeAsync2(ZodRealError2), safeEncode2 = /* @__PURE__ */ _safeEncode2(ZodRealError2), safeDecode2 = /* @__PURE__ */ _safeDecode2(ZodRealError2), safeEncodeAsync2 = /* @__PURE__ */ _safeEncodeAsync2(ZodRealError2), safeDecodeAsync2 = /* @__PURE__ */ _safeDecodeAsync2(ZodRealError2);
 
-// node_modules/zod/v4/classic/schemas.js
+// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/classic/schemas.js
 function _ensureDefaultLocale() {
   if (!globalConfig2.localeError)
     config2(en_default());
@@ -8259,6 +8508,9 @@ var ZodUUID2 = /* @__PURE__ */ $constructor2("ZodUUID", (inst, def) => {
 var ZodURL2 = /* @__PURE__ */ $constructor2("ZodURL", (inst, def) => {
   $ZodURL2.init(inst, def), ZodStringFormat2.init(inst, def);
 });
+function url(params) {
+  return _url2(ZodURL2, params);
+}
 var ZodEmoji2 = /* @__PURE__ */ $constructor2("ZodEmoji", (inst, def) => {
   $ZodEmoji2.init(inst, def), ZodStringFormat2.init(inst, def);
 });
@@ -8376,6 +8628,24 @@ var ZodNumberFormat2 = /* @__PURE__ */ $constructor2("ZodNumberFormat", (inst, d
 function int2(params) {
   return _int2(ZodNumberFormat2, params);
 }
+var ZodBoolean2 = /* @__PURE__ */ $constructor2("ZodBoolean", (inst, def) => {
+  $ZodBoolean2.init(inst, def), ZodType2.init(inst, def), inst._zod.processJSONSchema = (ctx, json, params) => booleanProcessor2(inst, ctx, json, params);
+});
+function boolean4(params) {
+  return _boolean2(ZodBoolean2, params);
+}
+var ZodUndefined = /* @__PURE__ */ $constructor2("ZodUndefined", (inst, def) => {
+  $ZodUndefined2.init(inst, def), ZodType2.init(inst, def), inst._zod.processJSONSchema = (ctx, json, params) => undefinedProcessor2(inst, ctx, json, params);
+});
+function _undefined5(params) {
+  return _undefined4(ZodUndefined, params);
+}
+var ZodNull = /* @__PURE__ */ $constructor2("ZodNull", (inst, def) => {
+  $ZodNull2.init(inst, def), ZodType2.init(inst, def), inst._zod.processJSONSchema = (ctx, json, params) => nullProcessor2(inst, ctx, json, params);
+});
+function _null5(params) {
+  return _null4(ZodNull, params);
+}
 var ZodUnknown2 = /* @__PURE__ */ $constructor2("ZodUnknown", (inst, def) => {
   $ZodUnknown2.init(inst, def), ZodType2.init(inst, def), inst._zod.processJSONSchema = (ctx, json, params) => unknownProcessor2(inst, ctx, json, params);
 });
@@ -8471,6 +8741,17 @@ function union2(options, params) {
   return new ZodUnion2({
     type: "union",
     options,
+    ...normalizeParams2(params)
+  });
+}
+var ZodDiscriminatedUnion = /* @__PURE__ */ $constructor2("ZodDiscriminatedUnion", (inst, def) => {
+  ZodUnion2.init(inst, def), $ZodDiscriminatedUnion2.init(inst, def);
+});
+function discriminatedUnion(discriminator, options, params) {
+  return new ZodDiscriminatedUnion({
+    type: "union",
+    options,
+    discriminator,
     ...normalizeParams2(params)
   });
 }
@@ -8656,6 +8937,12 @@ function _catch2(innerType, catchValue) {
     catchValue: typeof catchValue === "function" ? catchValue : constantCatch(catchValue)
   });
 }
+var ZodNaN = /* @__PURE__ */ $constructor2("ZodNaN", (inst, def) => {
+  $ZodNaN2.init(inst, def), ZodType2.init(inst, def), inst._zod.processJSONSchema = (ctx, json, params) => nanProcessor2(inst, ctx, json, params);
+});
+function nan(params) {
+  return _nan2(ZodNaN, params);
+}
 var ZodPipe2 = /* @__PURE__ */ $constructor2("ZodPipe", (inst, def) => {
   $ZodPipe2.init(inst, def), ZodType2.init(inst, def), inst._zod.processJSONSchema = (ctx, json, params) => pipeProcessor2(inst, ctx, json, params), inst.in = def.in, inst.out = def.out;
 });
@@ -8675,6 +8962,15 @@ function readonly2(innerType) {
     innerType
   });
 }
+var ZodLazy = /* @__PURE__ */ $constructor2("ZodLazy", (inst, def) => {
+  $ZodLazy2.init(inst, def), ZodType2.init(inst, def), inst._zod.processJSONSchema = (ctx, json, params) => lazyProcessor2(inst, ctx, json, params), inst.unwrap = () => inst._zod.def.getter();
+});
+function lazy(getter) {
+  return new ZodLazy({
+    type: "lazy",
+    getter
+  });
+}
 var ZodCustom2 = /* @__PURE__ */ $constructor2("ZodCustom", (inst, def) => {
   $ZodCustom2.init(inst, def), ZodType2.init(inst, def), inst._zod.processJSONSchema = (ctx, json, params) => customProcessor2(inst, ctx, json, params);
 });
@@ -8684,209 +8980,26 @@ function refine2(fn, _params = {}) {
 function superRefine2(fn, params) {
   return _superRefine2(fn, params);
 }
-// src/forge.ts
-var BudgetSchema = object2({
-  dailyBudgetCredits: number4().nonnegative(),
-  remainingCredits: number4().nonnegative()
-}), localTimezone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", readForgeUsage = async () => {
-  let usage = await (await useForgeClient()).usage().value, budget = BudgetSchema.safeParse(usage?.budget);
-  if (!budget.success)
-    throw Error("Forge returned an invalid balance.");
-  let { remainingCredits: available, dailyBudgetCredits: total } = budget.data;
-  return `Forge daily credits
-Available: ${available.toFixed(2)} credits
-Total: ${total.toFixed(2)} credits`;
-};
-
-// src/models.ts
-var EFFORT_PAYLOADS = ["minimal", "low", "medium", "high", "xhigh", "max"], isEffort = (value) => typeof value === "string" && EFFORT_PAYLOADS.some((payload) => payload === value), OMP_EFFORTS = EFFORT_PAYLOADS.map((payload) => {
-  if (!isEffort(payload))
-    throw Error(`Unknown thinking effort: ${payload}`);
-  return payload;
-}), tokenCost = (cost) => ({
-  cacheRead: cost.cache_read ?? 0,
-  cacheWrite: cost.cache_write ?? 0,
-  input: cost.input,
-  output: cost.output
-}), modelCost = (cost) => {
-  if (!cost)
-    throw Error("Forge model is missing token pricing.");
-  let mapped = tokenCost(cost), tiers = (cost.tiers ?? []).filter(({ tier }) => tier?.type === "context").toSorted((a, b) => a.tier.size - b.tier.size);
-  if (tiers.length)
-    mapped.longContext = {
-      ...tokenCost(tiers[0]),
-      inputThreshold: tiers[0].tier.size
-    };
-  return mapped;
-}, mapForgeModels = (catalog) => Object.values(catalog).map((model) => {
-  let effortValues = model.reasoning_options?.filter((option) => option.type === "effort").flatMap((option) => option.values) ?? [], efforts = OMP_EFFORTS.filter((effort) => effortValues.some((value) => isEffort(value) && value === effort)), thinking = model.reasoning && efforts.length ? { efforts, mode: "effort" } : void 0, cost = modelCost(model.cost), contextWindow = Math.min(model.limit.context, cost.longContext?.inputThreshold ?? model.limit.context), reasoningCompat = {
-    allowsSyntheticReasoningContentForToolCalls: !0,
-    disableReasoningOnForcedToolChoice: !1,
-    disableReasoningOnToolChoice: !1,
-    disableReasoningWithTools: !1,
-    extraBody: {},
-    omitReasoningEffort: efforts.length === 0,
-    qwenPreserveThinking: !1,
-    qwenTemplateReasoningEffort: !1,
-    reasoningContentField: "reasoning",
-    reasoningDisableMode: "openrouter-enabled-false",
-    reasoningEffortMap: Object.fromEntries(efforts.map((effort) => [effort, effort])),
-    replayReasoningContent: !1,
-    requiresReasoningContentForAllAssistantTurns: !1,
-    requiresReasoningContentForToolCalls: model.reasoning,
-    requiresThinkingAsText: !1,
-    supportsReasoningEffort: efforts.length > 0,
-    supportsReasoningParams: !0,
-    thinkingFormat: "openrouter"
-  };
-  return {
-    compat: {
-      ...reasoningCompat,
-      alwaysSendMaxTokens: !1,
-      clampOutputToModelMax: !0,
-      isOpenRouterHost: !0,
-      maxTokensField: "max_tokens",
-      supportsDeveloperRole: !1,
-      supportsMultipleSystemMessages: !0,
-      supportsStore: !1,
-      supportsUsageInStreaming: !0,
-      whenThinking: reasoningCompat,
-      wireModelIdMode: "raw"
-    },
-    contextWindow,
-    cost,
-    id: model.id,
-    input: model.modalities.input.filter((type) => type === "text" || type === "image"),
-    maxContextWindow: model.limit.context,
-    maxTokens: model.limit.output,
-    name: model.name,
-    reasoning: model.reasoning,
-    supportsTools: model.tool_call,
-    thinking
-  };
-});
-
-// src/desktop.ts
-var UNAVAILABLE = "Forge is unavailable or returned an invalid catalog. Start Forge Desktop, then restart OMP.";
-async function forgeDesktopPlugin(pi) {
-  let loadError, show = (content) => {
-    pi.sendMessage({ content, customType: "forge", display: !0 }, { triggerTurn: !1 });
-  }, loadModels = async () => {
-    let forge = await useForgeClient(), [providers, catalog] = await Promise.all([
-      forge.providers(),
-      forge.models({ tz: localTimezone() })
-    ]), { options } = providers.forge, models = mapForgeModels(catalog);
-    pi.registerProvider("forge", {
-      api: "openai-completions",
-      apiKey: options.apiKey,
-      baseUrl: options.baseURL,
-      headers: options.headers,
-      models
-    });
-  };
-  pi.registerCommand("forge", {
-    description: "Forge: /forge usage",
-    handler: async (args) => {
-      let [command, ...rest] = args.trim().split(/\s+/u);
-      if (command === "usage" && rest.length === 0) {
-        try {
-          show(await readForgeUsage());
-        } catch {
-          show("Forge balance unavailable. Start Forge Desktop and wait for its usage snapshot, then run /forge usage again.");
-        }
-        return;
-      }
-      show("Usage: /forge usage");
-    }
-  }), pi.on("session_start", (_event, ctx) => {
-    if (loadError !== void 0)
-      ctx.ui.notify(loadError, "error");
-  });
-  try {
-    await loadModels();
-  } catch {
-    loadError = UNAVAILABLE, console.error(`[forge] ${loadError}`);
-  }
+// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/classic/iso.js
+function datetime4(params) {
+  return _isoDateTime2(ZodISODateTime2, params);
 }
-
-// src/mcp.ts
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { getCapability, registerProvider } from "@oh-my-pi/pi-coding-agent/capability";
-import { mcpCapability } from "@oh-my-pi/pi-coding-agent/capability/mcp";
-import { findScopedSettings } from "@oh-my-pi/pi-coding-agent/config/settings";
-
-// src/mcp-config.ts
-var ServersSchema = object2({
-  forge: object2({ headers: unknown2().optional(), type: literal("remote"), url: string4() })
-}), HeadersSchema = record(string4(), string4()).optional(), McpEndpointSchema = unknown2().transform((servers, ctx) => {
-  let parsed = ServersSchema.safeParse(servers);
-  if (!parsed.success)
-    return ctx.addIssue({ code: "custom", message: "Forge MCP is not a remote endpoint." }), NEVER2;
-  let url = new URL(parsed.data.forge.url);
-  if (!["http:", "https:"].includes(url.protocol) || !["127.0.0.1", "localhost", "[::1]"].includes(url.hostname) || url.username || url.password)
-    return ctx.addIssue({ code: "custom", message: "Forge MCP must use a local HTTP endpoint." }), NEVER2;
-  let headers = HeadersSchema.safeParse(parsed.data.forge.headers);
-  if (!headers.success)
-    return ctx.addIssue({ code: "custom", message: "Forge MCP headers are invalid." }), NEVER2;
-  return { headers: headers.data, url };
-});
-
-// src/mcp.ts
-var registerForgeMcp = (pi, entrypoint) => {
-  let source = fileURLToPath(entrypoint), id = `forge-mcp:${source}`;
-  if (getCapability(mcpCapability.id)?.providers.some((provider) => provider.id === id) === !0)
-    return;
-  registerProvider(mcpCapability.id, {
-    description: "Discover Forge Desktop's HTTP MCP endpoint",
-    displayName: "Forge",
-    id,
-    load: async (ctx) => {
-      let settings = findScopedSettings(ctx.cwd, ctx.agentDir);
-      if (!settings)
-        return { items: [] };
-      let roots = ctx.extensionRoots;
-      if (!(await pi.pi.discoverSessionExtensionPaths(roots === void 0 ? {} : { extensionRoots: () => roots }, ctx.cwd, settings)).some((extension) => path.resolve(ctx.cwd, extension) === source))
-        return { items: [] };
-      try {
-        let forge = await useForgeClient(), { url, headers } = McpEndpointSchema.parse(await forge.mcp.servers());
-        return {
-          items: [
-            {
-              _source: { level: "user", path: source, provider: id, providerName: "Forge" },
-              headerPolicy: "origin-locked",
-              headers,
-              name: "forge",
-              transport: "http",
-              url: url.href
-            }
-          ]
-        };
-      } catch {
-        return {
-          items: [],
-          warnings: ["Forge MCP is unavailable. Start Forge Desktop, then restart OMP."]
-        };
-      }
-    },
-    priority: 50
-  });
-};
-
-// src/router/index.ts
-import path5 from "node:path";
-
-// src/router/catalog.ts
-import { createHash as createHash2, randomUUID as randomUUID3 } from "node:crypto";
-import { readFile as readFile3, mkdir as mkdir2, writeFile as writeFile3, rename as rename2, rm as rm2 } from "node:fs/promises";
-import path4 from "node:path";
-
-// ../models/src/index.ts
-import { createHash } from "node:crypto";
-import path3 from "node:path";
+function date4(params) {
+  return _isoDate2(ZodISODate2, params);
+}
+function time4(params) {
+  return _isoTime2(ZodISOTime2, params);
+}
+function duration4(params) {
+  return _isoDuration2(ZodISODuration2, params);
+}
+// ../models/src/catalog-cache.ts
+import { createHash, randomUUID as randomUUID2 } from "node:crypto";
+import { mkdir as mkdir2, readFile as readFile2, rename as rename2, rm as rm2, writeFile as writeFile2 } from "node:fs/promises";
+import path2 from "node:path";
 
 // ../../node_modules/.bun/env-paths@4.0.0/node_modules/env-paths/index.js
-import path2 from "node:path";
+import path from "node:path";
 import os2 from "node:os";
 import process3 from "node:process";
 
@@ -8922,31 +9035,31 @@ function assertSafeFilename(filename) {
 
 // ../../node_modules/.bun/env-paths@4.0.0/node_modules/env-paths/index.js
 var homedir2 = os2.homedir(), tmpdir = os2.tmpdir(), { env } = process3, macos = (name) => {
-  let library = path2.join(homedir2, "Library");
+  let library = path.join(homedir2, "Library");
   return {
-    data: path2.join(library, "Application Support", name),
-    config: path2.join(library, "Preferences", name),
-    cache: path2.join(library, "Caches", name),
-    log: path2.join(library, "Logs", name),
-    temp: path2.join(tmpdir, name)
+    data: path.join(library, "Application Support", name),
+    config: path.join(library, "Preferences", name),
+    cache: path.join(library, "Caches", name),
+    log: path.join(library, "Logs", name),
+    temp: path.join(tmpdir, name)
   };
 }, windows = (name) => {
-  let appData = env.APPDATA || path2.join(homedir2, "AppData", "Roaming"), localAppData = env.LOCALAPPDATA || path2.join(homedir2, "AppData", "Local");
+  let appData = env.APPDATA || path.join(homedir2, "AppData", "Roaming"), localAppData = env.LOCALAPPDATA || path.join(homedir2, "AppData", "Local");
   return {
-    data: path2.join(localAppData, name, "Data"),
-    config: path2.join(appData, name, "Config"),
-    cache: path2.join(localAppData, name, "Cache"),
-    log: path2.join(localAppData, name, "Log"),
-    temp: path2.join(tmpdir, name)
+    data: path.join(localAppData, name, "Data"),
+    config: path.join(appData, name, "Config"),
+    cache: path.join(localAppData, name, "Cache"),
+    log: path.join(localAppData, name, "Log"),
+    temp: path.join(tmpdir, name)
   };
 }, linux = (name) => {
-  let username = path2.basename(homedir2);
+  let username = path.basename(homedir2);
   return {
-    data: path2.join(env.XDG_DATA_HOME || path2.join(homedir2, ".local", "share"), name),
-    config: path2.join(env.XDG_CONFIG_HOME || path2.join(homedir2, ".config"), name),
-    cache: path2.join(env.XDG_CACHE_HOME || path2.join(homedir2, ".cache"), name),
-    log: path2.join(env.XDG_STATE_HOME || path2.join(homedir2, ".local", "state"), name),
-    temp: path2.join(tmpdir, username, name)
+    data: path.join(env.XDG_DATA_HOME || path.join(homedir2, ".local", "share"), name),
+    config: path.join(env.XDG_CONFIG_HOME || path.join(homedir2, ".config"), name),
+    cache: path.join(env.XDG_CACHE_HOME || path.join(homedir2, ".cache"), name),
+    log: path.join(env.XDG_STATE_HOME || path.join(homedir2, ".local", "state"), name),
+    temp: path.join(tmpdir, username, name)
   };
 };
 function envPaths(name, { suffix = "nodejs" } = {}) {
@@ -8958,6 +9071,100 @@ function envPaths(name, { suffix = "nodejs" } = {}) {
     return windows(name);
   return linux(name);
 }
+
+// ../models/src/catalog-cache.ts
+var Directory = path2.join(envPaths("forge-extensions", { suffix: "" }).cache, "catalogs"), filename = (scope) => {
+  let hash = createHash("sha256").update(JSON.stringify(scope)).digest("hex");
+  return path2.join(Directory, `${hash}.json`);
+}, readCatalog = async (scope, schema) => {
+  try {
+    let result = schema.safeParse(JSON.parse(await readFile2(filename(scope), "utf-8")));
+    return result.success ? result.data : void 0;
+  } catch {
+    return;
+  }
+}, writeCatalog = async (scope, catalog) => {
+  await mkdir2(Directory, { mode: 448, recursive: !0 });
+  let destination = filename(scope), temporary = `${destination}.${randomUUID2()}.tmp`;
+  try {
+    await writeFile2(temporary, `${JSON.stringify(catalog)}
+`, { mode: 384 }), await rename2(temporary, destination);
+  } finally {
+    await rm2(temporary, { force: !0 });
+  }
+};
+
+// ../models/src/desktop-catalog.ts
+var RateSchema = object2({
+  cache_read: number4().nonnegative().optional(),
+  cache_write: number4().nonnegative().optional(),
+  input: number4().nonnegative(),
+  output: number4().nonnegative()
+}), DesktopModelSchema = object2({
+  cost: RateSchema.extend({
+    tiers: array2(RateSchema.extend({
+      tier: object2({ size: number4().positive(), type: string4() })
+    })).optional()
+  }).optional(),
+  id: string4().min(1),
+  limit: object2({ context: number4().positive(), output: number4().positive() }),
+  modalities: object2({ input: array2(string4()), output: array2(string4()) }),
+  name: string4(),
+  reasoning: boolean4(),
+  reasoning_options: array2(discriminatedUnion("type", [
+    object2({ type: literal("effort"), values: array2(string4().nullable()) }),
+    object2({ type: literal("toggle") }),
+    object2({
+      max: number4().optional(),
+      min: number4().optional(),
+      type: literal("budget_tokens")
+    })
+  ])).optional(),
+  tool_call: boolean4()
+}).refine((model) => model.cost !== void 0, {
+  message: "Forge model is missing token pricing."
+}), DesktopCatalogSchema = object2({
+  fetchedAt: exports_iso2.datetime(),
+  models: record(string4(), DesktopModelSchema),
+  options: object2({
+    apiKey: string4().optional(),
+    baseURL: url(),
+    headers: record(string4(), string4()).optional()
+  }),
+  version: literal(1)
+}), ServerFile = path3.join(homedir3(), ".forge", "server.json"), desktopScope = async () => {
+  let server = await readFile3(ServerFile, "utf-8"), tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", day = (/* @__PURE__ */ new Date()).toLocaleDateString("en-CA", { timeZone: tz });
+  return ["desktop", server, tz, day];
+}, readDesktopCatalog = async () => {
+  try {
+    return await readCatalog(await desktopScope(), DesktopCatalogSchema);
+  } catch {
+    return;
+  }
+}, pending, refreshDesktopCatalog = async () => {
+  pending ??= (async () => {
+    let scope = await desktopScope().catch(() => {}), forge = await useForgeClient(), tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", [providers, models] = await Promise.all([forge.providers(), forge.models({ tz })]), catalog = DesktopCatalogSchema.parse({
+      fetchedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      models,
+      options: providers.forge.options,
+      version: 1
+    });
+    if (scope !== void 0) {
+      if (JSON.stringify(await desktopScope()) !== JSON.stringify(scope))
+        throw Error("Forge Desktop changed during model discovery. Refresh again.");
+      await writeCatalog(scope, catalog);
+    }
+    return catalog;
+  })();
+  try {
+    return await pending;
+  } finally {
+    pending = void 0;
+  }
+};
+// ../models/src/index.ts
+import { createHash as createHash2 } from "node:crypto";
+import path4 from "node:path";
 
 // ../../node_modules/.bun/unstorage@2.0.0-beta.0/node_modules/unstorage/dist/_chunks/libs/destr.mjs
 var suspectProtoRx = /"(?:_|\\u0{2}5[Ff]){2}(?:p|\\u0{2}70)(?:r|\\u0{2}72)(?:o|\\u0{2}6[Ff])(?:t|\\u0{2}74)(?:o|\\u0{2}6[Ff])(?:_|\\u0{2}5[Ff]){2}"\s*:/, suspectConstructorRx = /"(?:c|\\u0063)(?:o|\\u006[Ff])(?:n|\\u006[Ee])(?:s|\\u0073)(?:t|\\u0074)(?:r|\\u0072)(?:u|\\u0075)(?:c|\\u0063)(?:t|\\u0074)(?:o|\\u006[Ff])(?:r|\\u0072)"\s*:/, JsonSigRx = /^\s*["[{]|^\s*-?\d{1,16}(\.\d{1,17})?([Ee][+-]?\d+)?\s*$/;
@@ -9561,15 +9768,15 @@ async function dispose(driver) {
 // ../../node_modules/.bun/unstorage@2.0.0-beta.0/node_modules/unstorage/dist/_chunks/node-fs.mjs
 import { existsSync, promises } from "node:fs";
 import { basename, dirname, join as join2, resolve } from "node:path";
-import { randomUUID as randomUUID2 } from "node:crypto";
+import { randomUUID as randomUUID3 } from "node:crypto";
 function ignoreNotfound(err) {
   return err.code === "ENOENT" || err.code === "EISDIR" ? null : err;
 }
 function ignoreExists(err) {
   return err.code === "EEXIST" ? null : err;
 }
-var TMP_FILE_PREFIX = ".unstorage-tmp-", TMP_FILE_RE = /^\.unstorage-tmp-[\da-z-]+$/, _tmpFileId = `${process.pid.toString(36)}-${randomUUID2().slice(0, 8)}-`, _tmpFileCounter = 0;
-async function writeFile2(path, data, encoding, atomic) {
+var TMP_FILE_PREFIX = ".unstorage-tmp-", TMP_FILE_RE = /^\.unstorage-tmp-[\da-z-]+$/, _tmpFileId = `${process.pid.toString(36)}-${randomUUID3().slice(0, 8)}-`, _tmpFileCounter = 0;
+async function writeFile3(path, data, encoding, atomic) {
   let dir = dirname(path);
   if (await ensuredir(dir), !atomic)
     return promises.writeFile(path, data, encoding);
@@ -9587,7 +9794,7 @@ async function writeFile2(path, data, encoding, atomic) {
     throw await promises.unlink(tmp).catch(() => {}), error;
   }
 }
-function readFile2(path, encoding) {
+function readFile4(path, encoding) {
   return promises.readFile(path, encoding ?? null).catch(ignoreNotfound);
 }
 function unlink2(path) {
@@ -9649,10 +9856,10 @@ var PATH_TRAVERSE_RE = /\.\.:|\.\.$/, DRIVER_NAME2 = "fs-lite", driver2 = (opts 
       return existsSync2(r(key));
     },
     getItem(key) {
-      return readFile2(r(key), "utf8");
+      return readFile4(r(key), "utf8");
     },
     getItemRaw(key) {
-      return readFile2(r(key));
+      return readFile4(r(key));
     },
     async getMeta(key) {
       let { atime, mtime, size, birthtime, ctime } = await promises2.stat(r(key)).catch(() => ({}));
@@ -9667,12 +9874,12 @@ var PATH_TRAVERSE_RE = /\.\.:|\.\.$/, DRIVER_NAME2 = "fs-lite", driver2 = (opts 
     setItem(key, value) {
       if (opts.readOnly)
         return;
-      return writeFile2(r(key), value, "utf8", opts.atomic);
+      return writeFile3(r(key), value, "utf8", opts.atomic);
     },
     setItemRaw(key, value) {
       if (opts.readOnly)
         return;
-      return writeFile2(r(key), value, void 0, opts.atomic);
+      return writeFile3(r(key), value, void 0, opts.atomic);
     },
     removeItem(key) {
       if (opts.readOnly)
@@ -9690,7 +9897,194 @@ var PATH_TRAVERSE_RE = /\.\.:|\.\.$/, DRIVER_NAME2 = "fs-lite", driver2 = (opts 
   };
 };
 
-// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/util.js
+// ../models/src/model.ts
+var CACHE_TTL_MS = 86400000, modelName = (name) => name.replace(/^[^:]+:\s+/u, ""), LimitSchema = number4().int().positive(), RateSchema2 = number4().nonnegative(), TokenCostSchema = object2({
+  cacheRead: RateSchema2,
+  cacheWrite: RateSchema2,
+  input: RateSchema2,
+  output: RateSchema2
+}), ModelSchema = object2({
+  contextWindow: LimitSchema.optional(),
+  cost: TokenCostSchema.extend({
+    tiers: array2(TokenCostSchema.extend({ inputThreshold: LimitSchema }))
+  }).optional(),
+  efforts: array2(string4()),
+  id: string4().min(1),
+  input: array2(string4()),
+  maxTokens: LimitSchema.optional(),
+  name: string4(),
+  output: array2(string4()).min(1),
+  reasoning: boolean4(),
+  supportsTools: boolean4()
+}).superRefine((model, ctx) => {
+  if (!model.output.includes("text") && !model.output.includes("decisions"))
+    return;
+  for (let field of ["cost", "contextWindow", "maxTokens"])
+    if (model[field] === void 0)
+      ctx.addIssue({ code: "custom", message: "Required for text models", path: [field] });
+  if (!model.input.includes("text"))
+    ctx.addIssue({ code: "custom", message: "Text input is required", path: ["input"] });
+});
+
+// ../models/src/openrouter.ts
+var MetadataSchema = lazy(() => union2([
+  string4(),
+  number4(),
+  nan(),
+  literal(1 / 0),
+  literal(-1 / 0),
+  boolean4(),
+  _null5(),
+  _undefined5(),
+  array2(MetadataSchema),
+  record(string4(), MetadataSchema)
+])), MetadataObjectSchema = record(string4(), MetadataSchema), CatalogSchema = object2({ data: array2(MetadataSchema) }).catchall(MetadataSchema), record2 = (value) => {
+  let parsed = MetadataObjectSchema.safeParse(value);
+  return parsed.success ? parsed.data : void 0;
+}, TextsSchema = array2(unknown2()).transform((values) => values.flatMap((value) => {
+  let text = string4().safeParse(value);
+  return text.success ? [text.data] : [];
+})).catch([]), PriceSchema = union2([number4(), string4().trim().min(1).transform(Number)]).pipe(number4().nonnegative()).transform((amount) => amount * 1e6), LimitSchema2 = number4().int().positive(), TierSchema = MetadataObjectSchema.and(object2({ min_prompt_tokens: LimitSchema2 })), texts = (value) => TextsSchema.parse(value), price = (value, field, optional = !1) => {
+  if (optional && (value === void 0 || value === null))
+    return 0;
+  let amount = PriceSchema.safeParse(value);
+  if (!amount.success)
+    throw Error(`Invalid OpenRouter price: ${field}`);
+  return amount.data;
+}, tokenCosts = (pricing) => {
+  let input = price(pricing.prompt, "prompt"), output = price(pricing.completion, "completion");
+  return {
+    cacheRead: price(pricing.input_cache_read, "input_cache_read", !0),
+    cacheWrite: price(pricing.input_cache_write, "input_cache_write", !0),
+    input,
+    output
+  };
+}, costs = (pricing) => {
+  let base = tokenCosts(pricing), tiers = (Array.isArray(pricing.overrides) ? pricing.overrides : []).flatMap((value) => {
+    let tier = TierSchema.safeParse(value);
+    if (!tier.success)
+      return [];
+    return [
+      {
+        ...tokenCosts({ ...pricing, ...tier.data }),
+        inputThreshold: tier.data.min_prompt_tokens
+      }
+    ];
+  }).toSorted((a, b) => a.inputThreshold - b.inputThreshold);
+  return { ...base, tiers };
+}, limit = (value, field) => {
+  let parsed = LimitSchema2.safeParse(value);
+  if (!parsed.success)
+    throw Error(`Invalid OpenRouter token limit: ${field}`);
+  return parsed.data;
+}, EFFORTS = ["minimal", "low", "medium", "high", "xhigh", "max"], normalizeModel = (payload) => {
+  let model = record2(payload), id = string4().min(1).safeParse(model?.id);
+  if (model === void 0 || !id.success)
+    throw TypeError("Invalid OpenRouter model ID");
+  let architecture = record2(model.architecture), output = texts(architecture?.output_modalities);
+  if (output.length === 0)
+    throw Error(`Missing OpenRouter output modalities: ${id.data}`);
+  let input = texts(architecture?.input_modalities), parameters = texts(model.supported_parameters), efforts = texts(record2(model.reasoning)?.supported_efforts), name = string4().safeParse(model.name ?? id.data);
+  if (!name.success)
+    throw TypeError(`Invalid OpenRouter model name: ${id.data}`);
+  let normalized = {
+    efforts: EFFORTS.filter((effort) => efforts.includes(effort)),
+    id: id.data,
+    input,
+    name: modelName(name.data),
+    output,
+    reasoning: parameters.includes("reasoning") || parameters.includes("reasoning_effort"),
+    supportsTools: parameters.includes("tools")
+  };
+  if (!output.includes("text") && !output.includes("decisions"))
+    return normalized;
+  if (!input.includes("text"))
+    throw Error(`Unsupported OpenRouter input: ${id.data}`);
+  return normalized.cost = costs(record2(model.pricing) ?? {}), normalized.contextWindow = limit(model.context_length, "context_length"), normalized.maxTokens = limit(record2(model.top_provider)?.max_completion_tokens, "max_completion_tokens"), normalized;
+}, MODELS_URL = "https://openrouter.ai/api/v1/models?output_modalities=all", pending2, snapshot, fetchCatalog = async () => {
+  let response = await fetch(MODELS_URL, { signal: AbortSignal.timeout(8000) });
+  if (!response.ok)
+    throw Error(`OpenRouter returned HTTP ${response.status}.`);
+  let catalog = CatalogSchema.safeParse(await response.json());
+  if (!catalog.success)
+    throw TypeError("Invalid OpenRouter catalog.");
+  return { data: catalog.data.data, fetchedAt: Date.now() };
+}, readCatalog2 = async (refresh = !1) => {
+  let age = Date.now() - (snapshot?.fetchedAt ?? 0);
+  if (!refresh && snapshot !== void 0 && age >= 0 && age < CACHE_TTL_MS)
+    return snapshot;
+  pending2 ??= fetchCatalog();
+  try {
+    return snapshot = await pending2, snapshot;
+  } finally {
+    pending2 = void 0;
+  }
+}, catalogModel = (catalog, id) => {
+  let model = catalog.data.find((entry) => record2(entry)?.id === id);
+  if (model === void 0)
+    throw Error(`Router model missing from OpenRouter metadata: ${id}`);
+  return { fetchedAt: catalog.fetchedAt, model: normalizeModel(model) };
+};
+var fetchModels = async (ids) => {
+  if (ids.length === 0)
+    return [];
+  let catalog = await readCatalog2(!0);
+  return ids.map((id) => catalogModel(catalog, id));
+};
+
+// ../models/src/index.ts
+var CachedModelSchema = object2({ fetchedAt: number4(), model: ModelSchema }), Storage = createStorage({
+  driver: driver2({
+    atomic: !0,
+    base: path4.join(envPaths("forge-extensions", { suffix: "" }).cache, "models")
+  })
+}), cacheKey = (id) => `${createHash2("sha256").update(id).digest("hex")}.json`;
+var refreshModels = async (ids) => {
+  let entries = await fetchModels(ids);
+  return await Promise.all(entries.map(async (entry) => {
+    await Storage.setItem(cacheKey(entry.model.id), entry);
+  })), entries.map(({ model }) => model);
+};
+
+// ../models/src/router-catalog.ts
+var RouterResponseSchema = object2({ data: array2(object2({ id: string4().min(1) })) }), RouterCatalogSchema = object2({
+  data: array2(ModelSchema),
+  discoveredAt: exports_iso2.datetime(),
+  fetchedAt: exports_iso2.datetime(),
+  version: literal(1)
+}), scope = (baseUrl, key) => [
+  "router",
+  baseUrl.replace(/\/+$/u, ""),
+  key
+], readRouterCatalog = async (baseUrl, key) => await readCatalog(scope(baseUrl, key), RouterCatalogSchema), writeRouterCatalog = async (baseUrl, key, catalog) => {
+  await writeCatalog(scope(baseUrl, key), RouterCatalogSchema.parse({ ...catalog, version: 1 }));
+}, Pending = /* @__PURE__ */ new Map, refreshRouterCatalog = async (baseUrl, key) => {
+  let id = JSON.stringify(scope(baseUrl, key)), pending = Pending.get(id);
+  if (!pending)
+    pending = (async () => {
+      let response = await fetch(`${baseUrl.replace(/\/+$/u, "")}/models`, {
+        headers: { Authorization: `Bearer ${key}` },
+        redirect: "error",
+        signal: AbortSignal.timeout(8000)
+      });
+      if (!response.ok)
+        throw Error(`Forge Router model endpoint returned HTTP ${response.status}.`);
+      let router = RouterResponseSchema.parse(await response.json()), ids = [...new Set(router.data.map(({ id: modelID }) => modelID))], data = await refreshModels(ids), timestamp = (/* @__PURE__ */ new Date()).toISOString(), catalog = {
+        data,
+        discoveredAt: timestamp,
+        fetchedAt: timestamp,
+        version: 1
+      };
+      return await writeRouterCatalog(baseUrl, key, catalog), catalog;
+    })(), Pending.set(id, pending);
+  try {
+    return await pending;
+  } finally {
+    if (Pending.get(id) === pending)
+      Pending.delete(id);
+  }
+};
+// node_modules/zod/v4/core/util.js
 function getEnumValues3(entries) {
   let numericValues = Object.values(entries).filter((v) => typeof v === "number");
   return Object.entries(entries).filter(([k, _]) => numericValues.indexOf(+k) === -1).map(([_, v]) => v);
@@ -9730,25 +10124,6 @@ function floatSafeRemainder3(val, step) {
   if (Math.abs(ratio - roundedRatio) < tolerance)
     return 0;
   return ratio - roundedRatio;
-}
-var EVALUATING2 = /* @__PURE__ */ Symbol("evaluating");
-function defineLazy3(object, key, getter) {
-  let value = void 0;
-  Object.defineProperty(object, key, {
-    get() {
-      if (value === EVALUATING2)
-        return;
-      if (value === void 0)
-        value = EVALUATING2, value = getter();
-      return value;
-    },
-    set(v) {
-      Object.defineProperty(object, key, {
-        value: v
-      });
-    },
-    configurable: !0
-  });
 }
 function assignProp3(target, prop, value) {
   Object.defineProperty(target, prop, {
@@ -10004,18 +10379,6 @@ function prefixIssues3(path, issues) {
 function unwrapMessage3(message) {
   return typeof message === "string" ? message : message?.message;
 }
-function sizeCaps(defChecks) {
-  let caps = [];
-  for (let ch of defChecks ?? []) {
-    let d = ch._zod.def;
-    if (!/_(length|size)$|_equals$/.test(d.check))
-      break;
-    let max = d.maximum ?? d.length ?? d.size;
-    if (max >= 0)
-      caps.push([max, ch]);
-  }
-  return caps;
-}
 function attachSchema2(issues, start, inst) {
   var _a;
   for (let i = start;i < issues.length; i++)
@@ -10187,9 +10550,10 @@ function constantCatch2(value) {
   return fn[CONSTANT_CATCH2] = !0, fn;
 }
 
-// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/core.js
-var _a4;
-var _zodDesc2 = { value: void 0, enumerable: !1 }, _E2 = "captureStackTrace" in Error ? Error : null;
+// node_modules/zod/v4/core/core.js
+var _a4, NEVER2 = /* @__PURE__ */ Object.freeze({
+  status: "aborted"
+}), _zodDesc2 = { value: void 0, enumerable: !1 }, _E2 = "captureStackTrace" in Error ? Error : null;
 function newError2(Definition) {
   let E = _E2;
   if (E) {
@@ -10288,7 +10652,7 @@ function config3(newConfig) {
     Object.assign(globalConfig3, newConfig);
   return globalConfig3;
 }
-// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/errors.js
+// node_modules/zod/v4/core/errors.js
 function _getMessage2() {
   let internals = this._zod;
   return internals.message ?? (internals.message = JSON.stringify(internals.def, jsonStringifyReplacer3, 2)), internals.message;
@@ -10377,7 +10741,7 @@ function formatError3(error, mapper = (issue) => issue.message) {
   return processError(error), fieldErrors;
 }
 
-// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/parse.js
+// node_modules/zod/v4/core/parse.js
 function finalizeParams2(callee, params) {
   return { callee: params?.callee ?? callee, Err: params?.Err };
 }
@@ -10490,12 +10854,12 @@ var _safeEncodeAsync3 = (_Err) => async (schema, value, _ctx) => {
   return _safeParseAsync3(_Err)(schema, value, ctx);
 };
 var _safeDecodeAsync3 = (_Err) => async (schema, value, _ctx) => _safeParseAsync3(_Err)(schema, value, _ctx);
-// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/regexes.js
+// node_modules/zod/v4/core/regexes.js
 var cuid4 = /^[cC][0-9a-z]{6,}$/, cuid23 = /^[0-9a-z]+$/, ulid3 = /^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$/, xid3 = /^[0-9a-vA-V]{20}$/, ksuid3 = /^[A-Za-z0-9]{27}$/, nanoid3 = /^[a-zA-Z0-9_-]{21}$/;
 function nanoidOfLength2(length) {
   return new RegExp(`^[a-zA-Z0-9_-]{${length}}$`);
 }
-var duration4 = /^P(?:(\d+W)|(?!.*W)(?=\d|T\d)(\d+Y)?(\d+M)?(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(\d+([.,]\d+)?S)?)?)$/;
+var duration5 = /^P(?:(\d+W)|(?!.*W)(?=\d|T\d)(\d+Y)?(\d+M)?(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(\d+([.,]\d+)?S)?)?)$/;
 var guid3 = /^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/, uuid3 = (version) => {
   if (!version)
     return /^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$/;
@@ -10513,14 +10877,14 @@ var dateSource3 = "(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468]
 function anchor2(source) {
   return new RegExp(`^${source}$`);
 }
-var date4 = /* @__PURE__ */ anchor2(dateSource3);
+var date5 = /* @__PURE__ */ anchor2(dateSource3);
 function timeSource3(args) {
   return typeof args.precision === "number" ? args.precision === -1 ? "(?:[01]\\d|2[0-3]):[0-5]\\d" : args.precision === 0 ? "(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d" : `(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{${args.precision}}` : args.seconds ? "(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?" : "(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?";
 }
-function time4(args) {
+function time5(args) {
   return new RegExp(`^${timeSource3(args)}$`);
 }
-function datetime4(args) {
+function datetime5(args) {
   let opts = ["Z"];
   if (args.offset)
     opts.push("([+-](?:[01]\\d|2[0-3]):[0-5]\\d)");
@@ -10528,11 +10892,10 @@ function datetime4(args) {
   return new RegExp(`^${dateSource3}T(?:${timeRegex})$`);
 }
 var anyString2 = /^[\s\S]{0,}$/;
-var integer3 = /^-?\d+$/, number5 = /^-?\d+(?:\.\d+)?$/, boolean4 = /^(?:true|false)$/i, _null5 = /^null$/i;
-var _undefined5 = /^undefined$/i;
+var integer3 = /^-?\d+$/, number5 = /^-?\d+(?:\.\d+)?$/;
 var lowercase3 = /^[^A-Z]*$/, uppercase3 = /^[^a-z]*$/;
 
-// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/checks.js
+// node_modules/zod/v4/core/checks.js
 var $ZodCheck3 = /* @__PURE__ */ $constructor3("$ZodCheck", (inst, def) => {
   var _a;
   inst._zod ?? (inst._zod = {}), inst._zod.def = def, (_a = inst._zod).onattach ?? (_a.onattach = []);
@@ -10798,7 +11161,7 @@ var $ZodCheckOverwrite3 = /* @__PURE__ */ $constructor3("$ZodCheckOverwrite", (i
   };
 });
 
-// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/doc.js
+// node_modules/zod/v4/core/doc.js
 class Doc3 {
   constructor(args = [], closed = {}) {
     this.content = [], this.indent = 0, this.args = args, this.closed = closed;
@@ -10830,14 +11193,14 @@ ${content.join(`
   }
 }
 
-// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/versions.js
+// node_modules/zod/v4/core/versions.js
 var version3 = {
   major: 4,
   minor: 6,
-  patch: 7
+  patch: 5
 };
 
-// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/schemas.js
+// node_modules/zod/v4/core/schemas.js
 var $ZodType3 = /* @__PURE__ */ $constructor3("$ZodType", (inst, def) => {
   var _a;
   inst ?? (inst = {}), inst._zod.def = def, inst._zod.bag = inst._zod.bag || {}, inst._zod.version = version3;
@@ -11094,13 +11457,13 @@ var $ZodURL3 = /* @__PURE__ */ $constructor3("$ZodURL", (inst, def) => {
 }), $ZodKSUID3 = /* @__PURE__ */ $constructor3("$ZodKSUID", (inst, def) => {
   def.pattern ?? (def.pattern = ksuid3), $ZodStringFormat3.init(inst, def);
 }), $ZodISODateTime3 = /* @__PURE__ */ $constructor3("$ZodISODateTime", (inst, def) => {
-  def.pattern ?? (def.pattern = datetime4(def)), $ZodStringFormat3.init(inst, def);
+  def.pattern ?? (def.pattern = datetime5(def)), $ZodStringFormat3.init(inst, def);
 }), $ZodISODate3 = /* @__PURE__ */ $constructor3("$ZodISODate", (inst, def) => {
-  def.pattern ?? (def.pattern = date4), $ZodStringFormat3.init(inst, def);
+  def.pattern ?? (def.pattern = date5), $ZodStringFormat3.init(inst, def);
 }), $ZodISOTime3 = /* @__PURE__ */ $constructor3("$ZodISOTime", (inst, def) => {
-  def.pattern ?? (def.pattern = time4(def)), $ZodStringFormat3.init(inst, def);
+  def.pattern ?? (def.pattern = time5(def)), $ZodStringFormat3.init(inst, def);
 }), $ZodISODuration3 = /* @__PURE__ */ $constructor3("$ZodISODuration", (inst, def) => {
-  def.pattern ?? (def.pattern = duration4), $ZodStringFormat3.init(inst, def);
+  def.pattern ?? (def.pattern = duration5), $ZodStringFormat3.init(inst, def);
 }), $ZodIPv43 = /* @__PURE__ */ $constructor3("$ZodIPv4", (inst, def) => {
   def.pattern ?? (def.pattern = ipv43), $ZodStringFormat3.init(inst, def);
 }), ipv6Alphabet2 = /^[0-9a-fA-F:.]+$/;
@@ -11250,47 +11613,6 @@ var $ZodNumber3 = /* @__PURE__ */ $constructor3("$ZodNumber", (inst, def) => {
   };
 }), $ZodNumberFormat3 = /* @__PURE__ */ $constructor3("$ZodNumberFormat", (inst, def) => {
   $ZodCheckNumberFormat3.init(inst, def), $ZodNumber3.init(inst, def);
-}), $ZodBoolean3 = /* @__PURE__ */ $constructor3("$ZodBoolean", (inst, def) => {
-  $ZodType3.init(inst, def), inst._zod.pattern = boolean4, inst._zod.parse = (payload, _ctx) => {
-    if (def.coerce)
-      try {
-        payload.value = Boolean(payload.value);
-      } catch (_) {}
-    let input = payload.value;
-    if (typeof input === "boolean")
-      return payload;
-    return payload.issues.push({
-      expected: "boolean",
-      code: "invalid_type",
-      input,
-      inst
-    }), payload;
-  };
-});
-var $ZodUndefined3 = /* @__PURE__ */ $constructor3("$ZodUndefined", (inst, def) => {
-  $ZodType3.init(inst, def), inst._zod.pattern = _undefined5, inst._zod.values = /* @__PURE__ */ new Set([void 0]), inst._zod.parse = (payload, _ctx) => {
-    let input = payload.value;
-    if (typeof input > "u")
-      return payload;
-    return payload.issues.push({
-      expected: "undefined",
-      code: "invalid_type",
-      input,
-      inst
-    }), payload;
-  };
-}), $ZodNull3 = /* @__PURE__ */ $constructor3("$ZodNull", (inst, def) => {
-  $ZodType3.init(inst, def), inst._zod.pattern = _null5, inst._zod.values = /* @__PURE__ */ new Set([null]), inst._zod.parse = (payload, _ctx) => {
-    let input = payload.value;
-    if (input === null)
-      return payload;
-    return payload.issues.push({
-      expected: "null",
-      code: "invalid_type",
-      input,
-      inst
-    }), payload;
-  };
 });
 var $ZodUnknown3 = /* @__PURE__ */ $constructor3("$ZodUnknown", (inst, def) => {
   $ZodType3.init(inst, def), inst._zod.parse = (payload) => payload;
@@ -11302,24 +11624,6 @@ var $ZodUnknown3 = /* @__PURE__ */ $constructor3("$ZodUnknown", (inst, def) => {
     inst
   }), payload);
 });
-function capSize(inst, size) {
-  let caps = sizeCaps(inst._zod.def.checks);
-  if (!caps.length)
-    return;
-  let cap = Math.min(...caps.map((c) => c[0])), parse = inst._zod.parse;
-  inst._zod.parse = (payload, ctx) => {
-    let n = size(payload.value);
-    if (n > cap && !ctx?.skipChecks && ctx?.direction !== "backward") {
-      for (let [max, ch] of sizeCaps(inst._zod.def.checks))
-        if (n > max && ch._zod.def.when(payload)) {
-          let start = payload.issues.length;
-          return ch._zod.check(payload), payload.issues[start].continue = !1, attachSchema2(payload.issues, start, inst), payload;
-        }
-    }
-    return parse(payload, ctx);
-  };
-}
-var arraySize = (input) => Array.isArray(input) ? input.length : -1;
 function handleArrayResult3(result, final, index) {
   if (result.issues.length)
     final.issues.push(...prefixIssues3(index, result.issues));
@@ -11352,7 +11656,7 @@ var $ZodArray3 = /* @__PURE__ */ $constructor3("$ZodArray", (inst, def) => {
     if (proms.length)
       return Promise.all(proms).then(() => payload);
     return payload;
-  }, capSize(inst, arraySize);
+  };
 });
 function handlePropertyResult3(result, final, key, input, optin, optout) {
   let isPresent = key in input, isOptionalOut = optout === "optional";
@@ -12002,18 +12306,8 @@ var $ZodCatch3 = /* @__PURE__ */ $constructor3("$ZodCatch", (inst, def) => {
       return result.then((result) => handleCatchResult2(payload, result, def, ctx));
     return handleCatchResult2(payload, result, def, ctx);
   };
-}), $ZodNaN3 = /* @__PURE__ */ $constructor3("$ZodNaN", (inst, def) => {
-  $ZodType3.init(inst, def), inst._zod.parse = (payload, _ctx) => {
-    if (typeof payload.value !== "number" || !Number.isNaN(payload.value))
-      return payload.issues.push({
-        input: payload.value,
-        inst,
-        expected: "nan",
-        code: "invalid_type"
-      }), payload;
-    return payload;
-  };
-}), $ZodPipe3 = /* @__PURE__ */ $constructor3("$ZodPipe", (inst, def) => {
+});
+var $ZodPipe3 = /* @__PURE__ */ $constructor3("$ZodPipe", (inst, def) => {
   $ZodType3.init(inst, def), defineLazyInternal2(inst, "values", (zod) => zod.def.in._zod.values), defineLazyInternal2(inst, "optin", (zod) => zod.def.in._zod.optin), defineLazyInternal2(inst, "optout", (zod) => zod.def.out._zod.optout), defineLazyInternal2(inst, "propValues", (zod) => zod.def.in._zod.propValues), inst._zod.parse = (payload, ctx) => {
     if (ctx.direction === "backward") {
       let right = def.out._zod.run(payload, ctx);
@@ -12047,14 +12341,7 @@ function handleReadonlyResult3(payload) {
     payload.value = Object.freeze(payload.value);
   return payload;
 }
-var $ZodLazy3 = /* @__PURE__ */ $constructor3("$ZodLazy", (inst, def) => {
-  $ZodType3.init(inst, def), defineLazy3(inst._zod, "innerType", () => {
-    let d = def;
-    if (!d._cachedInner)
-      d._cachedInner = def.getter();
-    return d._cachedInner;
-  }), defineLazyInternal2(inst, "pattern", (zod) => zod.innerType?._zod?.pattern), defineLazyInternal2(inst, "propValues", (zod) => zod.innerType?._zod?.propValues), defineLazyInternal2(inst, "optin", (zod) => zod.innerType?._zod?.optin ?? void 0), defineLazyInternal2(inst, "optout", (zod) => zod.innerType?._zod?.optout ?? void 0), inst._zod.parse = (payload, ctx) => inst._zod.innerType._zod.run(payload, ctx);
-}), $ZodCustom3 = /* @__PURE__ */ $constructor3("$ZodCustom", (inst, def) => {
+var $ZodCustom3 = /* @__PURE__ */ $constructor3("$ZodCustom", (inst, def) => {
   $ZodCheck3.init(inst, def), $ZodType3.init(inst, def), inst._zod.parse = (payload, _) => payload, inst._zod.check = (payload) => {
     let input = payload.value, r = def.fn(input);
     if (r instanceof Promise)
@@ -12077,7 +12364,7 @@ function handleRefineResult3(result, payload, input, inst) {
     payload.issues.push(issue3(_iss));
   }
 }
-// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/memoizer.js
+// node_modules/zod/v4/core/memoizer.js
 class $ZodCyclicError2 extends Error {
   constructor() {
     super("Cannot parse a reference cycle that closes through a transform");
@@ -12303,7 +12590,7 @@ function isBackEdge2(ctx, value) {
   let backEdges = ctx[STATE2]?.backEdges;
   return backEdges !== void 0 && isRef2(value) && backEdges.has(value);
 }
-// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/locales/en.js
+// node_modules/zod/v4/locales/en.js
 var error2 = () => {
   let Sizable = {
     string: { unit: "characters", verb: "to have" },
@@ -12414,7 +12701,7 @@ function en_default2() {
     localeError: error2()
   };
 }
-// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/registries.js
+// node_modules/zod/v4/core/registries.js
 var _a5;
 class $ZodRegistry3 {
   constructor() {
@@ -12454,7 +12741,7 @@ function registry3() {
 }
 (_a5 = globalThis).__zod_globalRegistry ?? (_a5.__zod_globalRegistry = registry3());
 var globalRegistry3 = globalThis.__zod_globalRegistry;
-// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/api.js
+// node_modules/zod/v4/core/api.js
 function snapshotChecks2(def) {
   if (def.checks)
     def.checks = [...def.checks];
@@ -12712,24 +12999,6 @@ function _int3(Class, params) {
     ...normalizeParams3(params)
   });
 }
-function _boolean3(Class, params) {
-  return new Class({
-    type: "boolean",
-    ...normalizeParams3(params)
-  });
-}
-function _undefined6(Class, params) {
-  return new Class({
-    type: "undefined",
-    ...normalizeParams3(params)
-  });
-}
-function _null6(Class, params) {
-  return new Class({
-    type: "null",
-    ...normalizeParams3(params)
-  });
-}
 function _unknown3(Class) {
   return new Class({
     type: "unknown"
@@ -12738,12 +13007,6 @@ function _unknown3(Class) {
 function _never3(Class, params) {
   return new Class({
     type: "never",
-    ...normalizeParams3(params)
-  });
-}
-function _nan3(Class, params) {
-  return new Class({
-    type: "nan",
     ...normalizeParams3(params)
   });
 }
@@ -12911,7 +13174,7 @@ function _check3(fn, params) {
   });
   return ch._zod.check = fn, ch;
 }
-// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/to-json-schema.js
+// node_modules/zod/v4/core/to-json-schema.js
 function assignProps2(target, ...sources) {
   for (let source of sources)
     for (let key of Reflect.ownKeys(source))
@@ -13361,7 +13624,7 @@ var createToJSONSchemaMethod3 = (schema, processors = {}) => (params) => {
   let { libraryOptions, target } = params ?? {}, ctx = initializeContext3({ ...libraryOptions ?? {}, target, io, processors });
   return processSchema2(schema, ctx), extractDefs3(ctx, schema), finalize3(ctx, schema);
 };
-// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/json-schema-processors.js
+// node_modules/zod/v4/core/json-schema-processors.js
 var narrowMin2 = (agg, key, value) => {
   if (agg[key] === void 0 || value > agg[key])
     agg[key] = value;
@@ -13499,16 +13762,6 @@ var formatMap3 = {
     if (rest.length)
       json.allOf = [...json.allOf ?? [], ...rest.map((m) => ({ multipleOf: m }))];
   }
-}, booleanProcessor3 = (_schema, _ctx, json, _params) => {
-  json.type = "boolean";
-};
-var nullProcessor3 = (_schema, ctx, json, _params) => {
-  if (ctx.target === "openapi-3.0")
-    json.type = "string", json.nullable = !0, json.enum = [null];
-  else
-    json.type = "null";
-}, undefinedProcessor3 = (schema, ctx, json, params) => {
-  handleUnrepresentable2(schema, ctx, json, params, "Undefined cannot be represented in JSON Schema");
 };
 var neverProcessor3 = (_schema, _ctx, json, _params) => {
   json.not = {};
@@ -13561,8 +13814,6 @@ var enumProcessor3 = (schema, _ctx, json, _params) => {
       json.type = "null";
     json.enum = vals;
   }
-}, nanProcessor3 = (schema, ctx, json, params) => {
-  handleUnrepresentable2(schema, ctx, json, params, "NaN cannot be represented in JSON Schema");
 };
 var customProcessor3 = (schema, ctx, json, params) => {
   handleUnrepresentable2(schema, ctx, json, params, "Custom types cannot be represented in JSON Schema");
@@ -13798,13 +14049,8 @@ var optionalProcessor3 = (schema, ctx, _json, params) => {
   processSchema2(def.innerType, ctx, params);
   let seen = ctx.seen.get(schema);
   seen.ref = def.innerType;
-}, lazyProcessor3 = (schema, ctx, _json, params) => {
-  let innerType = schema._zod.innerType;
-  processSchema2(innerType, ctx, params);
-  let seen = ctx.seen.get(schema);
-  seen.ref = innerType;
 };
-// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/classic/errors.js
+// node_modules/zod/v4/classic/errors.js
 var _installedErrorProtos2 = /* @__PURE__ */ new WeakSet([Object.prototype, Error.prototype]);
 function _lazyMethod2(proto, key, make) {
   Object.defineProperty(proto, key, {
@@ -13840,10 +14086,10 @@ var ZodRealError3 = /* @__PURE__ */ $constructor3("ZodError", initializer6, void
   Parent: Error
 });
 
-// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/classic/parse.js
+// node_modules/zod/v4/classic/parse.js
 var parse8 = /* @__PURE__ */ _parse3(ZodRealError3), parseAsync4 = /* @__PURE__ */ _parseAsync3(ZodRealError3), safeParse4 = /* @__PURE__ */ _safeParse3(ZodRealError3), safeParseAsync4 = /* @__PURE__ */ _safeParseAsync3(ZodRealError3), encode3 = /* @__PURE__ */ _encode3(ZodRealError3), decode3 = /* @__PURE__ */ _decode3(ZodRealError3), encodeAsync3 = /* @__PURE__ */ _encodeAsync3(ZodRealError3), decodeAsync3 = /* @__PURE__ */ _decodeAsync3(ZodRealError3), safeEncode3 = /* @__PURE__ */ _safeEncode3(ZodRealError3), safeDecode3 = /* @__PURE__ */ _safeDecode3(ZodRealError3), safeEncodeAsync3 = /* @__PURE__ */ _safeEncodeAsync3(ZodRealError3), safeDecodeAsync3 = /* @__PURE__ */ _safeDecodeAsync3(ZodRealError3);
 
-// ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/classic/schemas.js
+// node_modules/zod/v4/classic/schemas.js
 function _ensureDefaultLocale2() {
   if (!globalConfig3.localeError)
     config3(en_default2());
@@ -14289,24 +14535,6 @@ var ZodNumberFormat3 = /* @__PURE__ */ $constructor3("ZodNumberFormat", (inst, d
 function int3(params) {
   return _int3(ZodNumberFormat3, params);
 }
-var ZodBoolean2 = /* @__PURE__ */ $constructor3("ZodBoolean", (inst, def) => {
-  $ZodBoolean3.init(inst, def), ZodType3.init(inst, def), inst._zod.processJSONSchema = (ctx, json, params) => booleanProcessor3(inst, ctx, json, params);
-});
-function boolean5(params) {
-  return _boolean3(ZodBoolean2, params);
-}
-var ZodUndefined = /* @__PURE__ */ $constructor3("ZodUndefined", (inst, def) => {
-  $ZodUndefined3.init(inst, def), ZodType3.init(inst, def), inst._zod.processJSONSchema = (ctx, json, params) => undefinedProcessor3(inst, ctx, json, params);
-});
-function _undefined7(params) {
-  return _undefined6(ZodUndefined, params);
-}
-var ZodNull = /* @__PURE__ */ $constructor3("ZodNull", (inst, def) => {
-  $ZodNull3.init(inst, def), ZodType3.init(inst, def), inst._zod.processJSONSchema = (ctx, json, params) => nullProcessor3(inst, ctx, json, params);
-});
-function _null7(params) {
-  return _null6(ZodNull, params);
-}
 var ZodUnknown3 = /* @__PURE__ */ $constructor3("ZodUnknown", (inst, def) => {
   $ZodUnknown3.init(inst, def), ZodType3.init(inst, def), inst._zod.processJSONSchema = (ctx, json, params) => unknownProcessor3(inst, ctx, json, params);
 });
@@ -14418,7 +14646,7 @@ function intersection3(left, right) {
 var ZodRecord2 = /* @__PURE__ */ $constructor3("ZodRecord", (inst, def) => {
   _ensureDefaultMemoizer2(), $ZodRecord3.init(inst, def), ZodType3.init(inst, def), inst._zod.processJSONSchema = (ctx, json, params) => recordProcessor3(inst, ctx, json, params), inst.keyType = def.keyType, inst.valueType = def.valueType;
 });
-function record2(keyType, valueType, params) {
+function record3(keyType, valueType, params) {
   if (!valueType || !valueType._zod)
     return new ZodRecord2({
       type: "record",
@@ -14587,12 +14815,6 @@ function _catch3(innerType, catchValue) {
     catchValue: typeof catchValue === "function" ? catchValue : constantCatch2(catchValue)
   });
 }
-var ZodNaN = /* @__PURE__ */ $constructor3("ZodNaN", (inst, def) => {
-  $ZodNaN3.init(inst, def), ZodType3.init(inst, def), inst._zod.processJSONSchema = (ctx, json, params) => nanProcessor3(inst, ctx, json, params);
-});
-function nan(params) {
-  return _nan3(ZodNaN, params);
-}
 var ZodPipe3 = /* @__PURE__ */ $constructor3("ZodPipe", (inst, def) => {
   $ZodPipe3.init(inst, def), ZodType3.init(inst, def), inst._zod.processJSONSchema = (ctx, json, params) => pipeProcessor3(inst, ctx, json, params), inst.in = def.in, inst.out = def.out;
 });
@@ -14612,15 +14834,6 @@ function readonly3(innerType) {
     innerType
   });
 }
-var ZodLazy = /* @__PURE__ */ $constructor3("ZodLazy", (inst, def) => {
-  $ZodLazy3.init(inst, def), ZodType3.init(inst, def), inst._zod.processJSONSchema = (ctx, json, params) => lazyProcessor3(inst, ctx, json, params), inst.unwrap = () => inst._zod.def.getter();
-});
-function lazy(getter) {
-  return new ZodLazy({
-    type: "lazy",
-    getter
-  });
-}
 var ZodCustom3 = /* @__PURE__ */ $constructor3("ZodCustom", (inst, def) => {
   $ZodCustom3.init(inst, def), ZodType3.init(inst, def), inst._zod.processJSONSchema = (ctx, json, params) => customProcessor3(inst, ctx, json, params);
 });
@@ -14630,168 +14843,214 @@ function refine3(fn, _params = {}) {
 function superRefine3(fn, params) {
   return _superRefine3(fn, params);
 }
-// ../models/src/model.ts
-var CACHE_TTL_MS = 86400000, modelName = (name) => name.replace(/^[^:]+:\s+/u, ""), LimitSchema = number6().int().positive(), RateSchema = number6().nonnegative(), TokenCostSchema = object3({
-  cacheRead: RateSchema,
-  cacheWrite: RateSchema,
-  input: RateSchema,
-  output: RateSchema
-}), ModelSchema = object3({
-  contextWindow: LimitSchema.optional(),
-  cost: TokenCostSchema.extend({
-    tiers: array3(TokenCostSchema.extend({ inputThreshold: LimitSchema }))
-  }).optional(),
-  efforts: array3(string6()),
-  id: string6().min(1),
-  input: array3(string6()),
-  maxTokens: LimitSchema.optional(),
-  name: string6(),
-  output: array3(string6()).min(1),
-  reasoning: boolean5(),
-  supportsTools: boolean5()
-}).superRefine((model, ctx) => {
-  if (!model.output.includes("text") && !model.output.includes("decisions"))
-    return;
-  for (let field of ["cost", "contextWindow", "maxTokens"])
-    if (model[field] === void 0)
-      ctx.addIssue({ code: "custom", message: "Required for text models", path: [field] });
-  if (!model.input.includes("text"))
-    ctx.addIssue({ code: "custom", message: "Text input is required", path: ["input"] });
+// src/forge.ts
+var BudgetSchema = object3({
+  dailyBudgetCredits: number6().nonnegative(),
+  remainingCredits: number6().nonnegative()
+}), readForgeUsage = async () => {
+  let usage = await (await useForgeClient()).usage().value, budget = BudgetSchema.safeParse(usage?.budget);
+  if (!budget.success)
+    throw Error("Forge returned an invalid balance.");
+  let { remainingCredits: available, dailyBudgetCredits: total } = budget.data;
+  return `Forge daily credits
+Available: ${available.toFixed(2)} credits
+Total: ${total.toFixed(2)} credits`;
+};
+
+// src/models.ts
+var EFFORT_PAYLOADS = ["minimal", "low", "medium", "high", "xhigh", "max"], isEffort = (value) => typeof value === "string" && EFFORT_PAYLOADS.some((payload) => payload === value), OMP_EFFORTS = EFFORT_PAYLOADS.map((payload) => {
+  if (!isEffort(payload))
+    throw Error(`Unknown thinking effort: ${payload}`);
+  return payload;
+}), tokenCost = (cost) => ({
+  cacheRead: cost.cache_read ?? 0,
+  cacheWrite: cost.cache_write ?? 0,
+  input: cost.input,
+  output: cost.output
+}), modelCost = (cost) => {
+  if (!cost)
+    throw Error("Forge model is missing token pricing.");
+  let mapped = tokenCost(cost), tiers = (cost.tiers ?? []).filter(({ tier }) => tier?.type === "context").toSorted((a, b) => a.tier.size - b.tier.size);
+  if (tiers.length)
+    mapped.longContext = {
+      ...tokenCost(tiers[0]),
+      inputThreshold: tiers[0].tier.size
+    };
+  return mapped;
+}, mapForgeModels = (catalog) => Object.values(catalog).map((model) => {
+  let effortValues = model.reasoning_options?.filter((option) => option.type === "effort").flatMap((option) => option.values) ?? [], efforts = OMP_EFFORTS.filter((effort) => effortValues.some((value) => isEffort(value) && value === effort)), thinking = model.reasoning && efforts.length ? { efforts, mode: "effort" } : void 0, cost = modelCost(model.cost), contextWindow = Math.min(model.limit.context, cost.longContext?.inputThreshold ?? model.limit.context), reasoningCompat = {
+    allowsSyntheticReasoningContentForToolCalls: !0,
+    disableReasoningOnForcedToolChoice: !1,
+    disableReasoningOnToolChoice: !1,
+    disableReasoningWithTools: !1,
+    extraBody: {},
+    omitReasoningEffort: efforts.length === 0,
+    qwenPreserveThinking: !1,
+    qwenTemplateReasoningEffort: !1,
+    reasoningContentField: "reasoning",
+    reasoningDisableMode: "openrouter-enabled-false",
+    reasoningEffortMap: Object.fromEntries(efforts.map((effort) => [effort, effort])),
+    replayReasoningContent: !1,
+    requiresReasoningContentForAllAssistantTurns: !1,
+    requiresReasoningContentForToolCalls: model.reasoning,
+    requiresThinkingAsText: !1,
+    supportsReasoningEffort: efforts.length > 0,
+    supportsReasoningParams: !0,
+    thinkingFormat: "openrouter"
+  };
+  return {
+    compat: {
+      ...reasoningCompat,
+      alwaysSendMaxTokens: !1,
+      clampOutputToModelMax: !0,
+      isOpenRouterHost: !0,
+      maxTokensField: "max_tokens",
+      supportsDeveloperRole: !1,
+      supportsMultipleSystemMessages: !0,
+      supportsStore: !1,
+      supportsUsageInStreaming: !0,
+      whenThinking: reasoningCompat,
+      wireModelIdMode: "raw"
+    },
+    contextWindow,
+    cost,
+    id: model.id,
+    input: model.modalities.input.filter((type) => type === "text" || type === "image"),
+    maxContextWindow: model.limit.context,
+    maxTokens: model.limit.output,
+    name: model.name,
+    reasoning: model.reasoning,
+    supportsTools: model.tool_call,
+    thinking
+  };
 });
 
-// ../models/src/openrouter.ts
-var MetadataSchema = lazy(() => union3([
-  string6(),
-  number6(),
-  nan(),
-  literal2(1 / 0),
-  literal2(-1 / 0),
-  boolean5(),
-  _null7(),
-  _undefined7(),
-  array3(MetadataSchema),
-  record2(string6(), MetadataSchema)
-])), MetadataObjectSchema = record2(string6(), MetadataSchema), CatalogSchema = object3({ data: array3(MetadataSchema) }).catchall(MetadataSchema), record3 = (value) => {
-  let parsed = MetadataObjectSchema.safeParse(value);
-  return parsed.success ? parsed.data : void 0;
-}, TextsSchema = array3(unknown3()).transform((values) => values.flatMap((value) => {
-  let text = string6().safeParse(value);
-  return text.success ? [text.data] : [];
-})).catch([]), PriceSchema = union3([number6(), string6().trim().min(1).transform(Number)]).pipe(number6().nonnegative()).transform((amount) => amount * 1e6), LimitSchema2 = number6().int().positive(), TierSchema = MetadataObjectSchema.and(object3({ min_prompt_tokens: LimitSchema2 })), texts = (value) => TextsSchema.parse(value), price = (value, field, optional = !1) => {
-  if (optional && (value === void 0 || value === null))
-    return 0;
-  let amount = PriceSchema.safeParse(value);
-  if (!amount.success)
-    throw Error(`Invalid OpenRouter price: ${field}`);
-  return amount.data;
-}, tokenCosts = (pricing) => {
-  let input = price(pricing.prompt, "prompt"), output = price(pricing.completion, "completion");
-  return {
-    cacheRead: price(pricing.input_cache_read, "input_cache_read", !0),
-    cacheWrite: price(pricing.input_cache_write, "input_cache_write", !0),
-    input,
-    output
+// src/desktop.ts
+var UNAVAILABLE = "Forge is unavailable or returned an invalid catalog. Start Forge Desktop, then restart OMP.";
+async function forgeDesktopPlugin(pi) {
+  let loadError, registered = !1, signature, cached = !1, show = (content) => {
+    pi.sendMessage({ content, customType: "forge", display: !0 }, { triggerTurn: !1 });
+  }, register = ({ options, models: catalog }) => {
+    let models = mapForgeModels(catalog), updated = JSON.stringify({ catalog, options });
+    if (signature === updated)
+      return models.length;
+    if (registered)
+      pi.unregisterProvider("forge");
+    return pi.registerProvider("forge", {
+      api: "openai-completions",
+      apiKey: options.apiKey,
+      baseUrl: options.baseURL,
+      fetchDynamicModels: async () => await Promise.resolve(models),
+      headers: options.headers,
+      models
+    }), registered = !0, signature = updated, loadError = void 0, models.length;
+  }, refresh = async () => register(await refreshDesktopCatalog()), update = async (ctx) => {
+    await refresh(), await ctx.modelRegistry.refreshRuntimeProviders("online");
   };
-}, costs = (pricing) => {
-  let base = tokenCosts(pricing), tiers = (Array.isArray(pricing.overrides) ? pricing.overrides : []).flatMap((value) => {
-    let tier = TierSchema.safeParse(value);
-    if (!tier.success)
-      return [];
-    return [
-      {
-        ...tokenCosts({ ...pricing, ...tier.data }),
-        inputThreshold: tier.data.min_prompt_tokens
+  pi.registerCommand("forge", {
+    description: "Forge: /forge usage",
+    handler: async (args) => {
+      let [command, ...rest] = args.trim().split(/\s+/u);
+      if (command === "usage" && rest.length === 0) {
+        try {
+          show(await readForgeUsage());
+        } catch {
+          show("Forge balance unavailable. Start Forge Desktop and wait for its usage snapshot, then run /forge usage again.");
+        }
+        return;
       }
-    ];
-  }).toSorted((a, b) => a.inputThreshold - b.inputThreshold);
-  return { ...base, tiers };
-}, limit = (value, field) => {
-  let parsed = LimitSchema2.safeParse(value);
-  if (!parsed.success)
-    throw Error(`Invalid OpenRouter token limit: ${field}`);
-  return parsed.data;
-}, EFFORTS = ["minimal", "low", "medium", "high", "xhigh", "max"], normalizeModel = (payload) => {
-  let model = record3(payload), id = string6().min(1).safeParse(model?.id);
-  if (model === void 0 || !id.success)
-    throw TypeError("Invalid OpenRouter model ID");
-  let architecture = record3(model.architecture), output = texts(architecture?.output_modalities);
-  if (output.length === 0)
-    throw Error(`Missing OpenRouter output modalities: ${id.data}`);
-  let input = texts(architecture?.input_modalities), parameters = texts(model.supported_parameters), efforts = texts(record3(model.reasoning)?.supported_efforts), name = string6().safeParse(model.name ?? id.data);
-  if (!name.success)
-    throw TypeError(`Invalid OpenRouter model name: ${id.data}`);
-  let normalized = {
-    efforts: EFFORTS.filter((effort) => efforts.includes(effort)),
-    id: id.data,
-    input,
-    name: modelName(name.data),
-    output,
-    reasoning: parameters.includes("reasoning") || parameters.includes("reasoning_effort"),
-    supportsTools: parameters.includes("tools")
-  };
-  if (!output.includes("text") && !output.includes("decisions"))
-    return normalized;
-  if (!input.includes("text"))
-    throw Error(`Unsupported OpenRouter input: ${id.data}`);
-  return normalized.cost = costs(record3(model.pricing) ?? {}), normalized.contextWindow = limit(model.context_length, "context_length"), normalized.maxTokens = limit(record3(model.top_provider)?.max_completion_tokens, "max_completion_tokens"), normalized;
-}, MODELS_URL = "https://openrouter.ai/api/v1/models?output_modalities=all", pending, snapshot, fetchCatalog = async () => {
-  let response = await fetch(MODELS_URL, { signal: AbortSignal.timeout(8000) });
-  if (!response.ok)
-    throw Error(`OpenRouter returned HTTP ${response.status}.`);
-  let catalog = CatalogSchema.safeParse(await response.json());
-  if (!catalog.success)
-    throw TypeError("Invalid OpenRouter catalog.");
-  return { data: catalog.data.data, fetchedAt: Date.now() };
-}, readCatalog = async () => {
-  let age = Date.now() - (snapshot?.fetchedAt ?? 0);
-  if (snapshot !== void 0 && age >= 0 && age < CACHE_TTL_MS)
-    return snapshot;
-  pending ??= fetchCatalog();
+      show("Usage: /forge usage");
+    }
+  }), pi.on("session_start", (_event, ctx) => {
+    if (loadError !== void 0)
+      ctx.ui.notify(loadError, "error");
+    if (cached)
+      ctx.setTimeout(() => {
+        update(ctx).catch(() => {
+          ctx.ui.notify("Forge refresh failed; cached models retained.", "warning");
+        });
+      }, 0);
+  });
   try {
-    return snapshot = await pending, snapshot;
-  } finally {
-    pending = void 0;
+    let catalog = await readDesktopCatalog();
+    cached = catalog !== void 0, register(catalog ?? await refreshDesktopCatalog());
+  } catch {
+    loadError = UNAVAILABLE, console.error(`[forge] ${loadError}`);
   }
-}, fetchModel = async (id) => {
-  let catalog = await readCatalog(), model = catalog.data.find((entry) => record3(entry)?.id === id);
-  if (model === void 0)
-    throw Error(`Router model missing from OpenRouter metadata: ${id}`);
-  return { fetchedAt: catalog.fetchedAt, model: normalizeModel(model) };
+  return refresh;
+}
+
+// src/mcp.ts
+import path5 from "node:path";
+import { fileURLToPath } from "node:url";
+import { getCapability, registerProvider } from "@oh-my-pi/pi-coding-agent/capability";
+import { mcpCapability } from "@oh-my-pi/pi-coding-agent/capability/mcp";
+import { findScopedSettings } from "@oh-my-pi/pi-coding-agent/config/settings";
+
+// src/mcp-config.ts
+var ServersSchema = object3({
+  forge: object3({ headers: unknown3().optional(), type: literal2("remote"), url: string6() })
+}), HeadersSchema = record3(string6(), string6()).optional(), McpEndpointSchema = unknown3().transform((servers, ctx) => {
+  let parsed = ServersSchema.safeParse(servers);
+  if (!parsed.success)
+    return ctx.addIssue({ code: "custom", message: "Forge MCP is not a remote endpoint." }), NEVER2;
+  let url = new URL(parsed.data.forge.url);
+  if (!["http:", "https:"].includes(url.protocol) || !["127.0.0.1", "localhost", "[::1]"].includes(url.hostname) || url.username || url.password)
+    return ctx.addIssue({ code: "custom", message: "Forge MCP must use a local HTTP endpoint." }), NEVER2;
+  let headers = HeadersSchema.safeParse(parsed.data.forge.headers);
+  if (!headers.success)
+    return ctx.addIssue({ code: "custom", message: "Forge MCP headers are invalid." }), NEVER2;
+  return { headers: headers.data, url };
+});
+
+// src/mcp.ts
+var registerForgeMcp = (pi, entrypoint) => {
+  let source = fileURLToPath(entrypoint), id = `forge-mcp:${source}`;
+  if (getCapability(mcpCapability.id)?.providers.some((provider) => provider.id === id) === !0)
+    return;
+  registerProvider(mcpCapability.id, {
+    description: "Discover Forge Desktop's HTTP MCP endpoint",
+    displayName: "Forge",
+    id,
+    load: async (ctx) => {
+      let settings = findScopedSettings(ctx.cwd, ctx.agentDir);
+      if (!settings)
+        return { items: [] };
+      let roots = ctx.extensionRoots;
+      if (!(await pi.pi.discoverSessionExtensionPaths(roots === void 0 ? {} : { extensionRoots: () => roots }, ctx.cwd, settings)).some((extension) => path5.resolve(ctx.cwd, extension) === source))
+        return { items: [] };
+      try {
+        let forge = await useForgeClient(), { url, headers } = McpEndpointSchema.parse(await forge.mcp.servers());
+        return {
+          items: [
+            {
+              _source: { level: "user", path: source, provider: id, providerName: "Forge" },
+              headerPolicy: "origin-locked",
+              headers,
+              name: "forge",
+              transport: "http",
+              url: url.href
+            }
+          ]
+        };
+      } catch {
+        return {
+          items: [],
+          warnings: ["Forge MCP is unavailable. Start Forge Desktop, then restart OMP."]
+        };
+      }
+    },
+    priority: 50
+  });
 };
 
-// ../models/src/index.ts
-var CachedModelSchema = object3({ fetchedAt: number6(), model: ModelSchema }), Storage = createStorage({
-  driver: driver2({
-    atomic: !0,
-    base: path3.join(envPaths("forge-extensions", { suffix: "" }).cache, "models")
-  })
-}), cacheKey = (id) => `${createHash("sha256").update(id).digest("hex")}.json`, readCachedModel = async (id) => {
-  try {
-    let cached = CachedModelSchema.safeParse(await Storage.getItem(cacheKey(id)));
-    if (!cached.success || cached.data.model.id !== id)
-      return;
-    return {
-      ...cached.data,
-      model: { ...cached.data.model, name: modelName(cached.data.model.name) }
-    };
-  } catch {
-    return;
-  }
-}, createModel = async (id) => {
-  if (id.trim() === "")
-    throw TypeError("A model ID is required.");
-  let cached = await readCachedModel(id), age = Date.now() - (cached?.fetchedAt ?? 0);
-  if (cached !== void 0 && age >= 0 && age < CACHE_TTL_MS)
-    return cached.model;
-  try {
-    let { fetchedAt, model } = await fetchModel(id);
-    return await Storage.setItem(cacheKey(id), { fetchedAt, model }), model;
-  } catch (error) {
-    if (cached !== void 0)
-      return cached.model;
-    throw error;
-  }
-};
+// src/router/index.ts
+import path7 from "node:path";
+
+// src/router/catalog.ts
+import { createHash as createHash3, randomUUID as randomUUID4 } from "node:crypto";
+import { readFile as readFile5, mkdir as mkdir3, writeFile as writeFile4, rename as rename3, rm as rm3 } from "node:fs/promises";
+import path6 from "node:path";
 
 // src/router/models.ts
 var EFFORT_PAYLOADS2 = ["minimal", "low", "medium", "high", "xhigh", "max"], isEffort2 = (value) => typeof value === "string" && EFFORT_PAYLOADS2.some((payload) => payload === value), OMP_EFFORTS2 = EFFORT_PAYLOADS2.map((payload) => {
@@ -14863,34 +15122,26 @@ var EFFORT_PAYLOADS2 = ["minimal", "low", "medium", "high", "xhigh", "max"], isE
 });
 
 // src/router/catalog.ts
-var RouterCatalogSchema = object2({ data: array2(object2({ id: string4().min(1) })) }), TimestampSchema = string4().refine((value) => Number.isFinite(Date.parse(value))), StartupCatalogSchema = RouterCatalogSchema.extend({
+var RouterCatalogSchema2 = object3({ data: array3(object3({ id: string6().min(1) })) }), TimestampSchema = string6().refine((value) => Number.isFinite(Date.parse(value))), StartupCatalogSchema = RouterCatalogSchema2.extend({
+  data: array3(ModelSchema),
   discoveredAt: TimestampSchema,
   fetchedAt: TimestampSchema,
-  version: literal(1)
+  version: literal2(1)
 }), startupCatalogPath = (cacheDirectory, baseUrl, key) => {
-  let scope = createHash2("sha256").update(JSON.stringify([baseUrl, key])).digest("hex");
-  return path4.join(cacheDirectory, `startup-catalog-${scope}.json`);
+  let scope = createHash3("sha256").update(JSON.stringify([baseUrl, key])).digest("hex");
+  return path6.join(cacheDirectory, `startup-catalog-${scope}.json`);
 }, readStartupCatalog = async (cacheDirectory, baseUrl, key) => {
   try {
-    let parsed = StartupCatalogSchema.safeParse(JSON.parse(await readFile3(startupCatalogPath(cacheDirectory, baseUrl, key), "utf-8")));
+    let parsed = StartupCatalogSchema.safeParse(JSON.parse(await readFile5(startupCatalogPath(cacheDirectory, baseUrl, key), "utf-8")));
     if (!parsed.success)
       return;
-    let cached = parsed.data, data = await Promise.all(cached.data.map(async ({ id }) => await createModel(id)));
+    let cached = parsed.data, { data } = cached;
     return mapOpenRouterModels(data), { data, discoveredAt: cached.discoveredAt, fetchedAt: cached.fetchedAt };
   } catch {
     return;
   }
-}, writeStartupCatalog = async (cacheDirectory, baseUrl, key, catalog) => {
-  let cachePath = startupCatalogPath(cacheDirectory, baseUrl, key);
-  await mkdir2(cacheDirectory, { recursive: !0 });
-  let temporary = `${cachePath}.${randomUUID3()}.tmp`;
-  try {
-    await writeFile3(temporary, `${JSON.stringify({ version: 1, ...catalog })}
-`, { mode: 384 }), await rename2(temporary, cachePath);
-  } finally {
-    await rm2(temporary, { force: !0 });
-  }
-}, fetchRouterCatalog = async (baseUrl, key, {
+};
+var fetchRouterCatalog = async (baseUrl, key, {
   fetcher = fetch,
   signal
 } = {}) => {
@@ -14908,26 +15159,26 @@ var RouterCatalogSchema = object2({ data: array2(object2({ id: string4().min(1) 
   }
   if (!response.ok)
     throw Error(`Forge Router model endpoint returned HTTP ${response.status}.`);
-  let catalog = RouterCatalogSchema.safeParse(await response.json());
+  let catalog = RouterCatalogSchema2.safeParse(await response.json());
   if (!catalog.success)
     throw Error("Invalid Forge Router model catalog.");
   return catalog.data;
 }, discoverCatalog = async (baseUrl, key) => {
-  let router = await fetchRouterCatalog(baseUrl, key), ids = [...new Set(router.data.map((model) => model.id))], data = await Promise.all(ids.map(async (id) => await createModel(id)));
-  mapOpenRouterModels(data);
-  let discoveredAt = (/* @__PURE__ */ new Date()).toISOString();
-  return { data, discoveredAt, fetchedAt: discoveredAt };
+  if (key === void 0 || key === "")
+    throw Error("Log in to Forge Router with /login before discovering models.");
+  let catalog = await refreshRouterCatalog(baseUrl, key);
+  return mapOpenRouterModels(catalog.data), catalog;
 };
 
 // src/router/index.ts
 var PROVIDER = "forge-router", DEFAULT_BASE_URL = "https://forge.forgeworkspace.dev/functions/v1/forge-api/v1", forgeRouterPlugin = async (pi) => {
-  let configuredUrl = process.env.FORGE_ROUTER_BASE_URL, baseUrl = (configuredUrl === void 0 || configuredUrl === "" ? DEFAULT_BASE_URL : configuredUrl).replace(/\/+$/u, ""), cacheDirectory = path5.join(pi.pi.getAgentDir(), "cache", "forge-router"), auth = await pi.pi.discoverAuthStorage(pi.pi.getAgentDir()), startupKey;
+  let configuredUrl = process.env.FORGE_ROUTER_BASE_URL, baseUrl = (configuredUrl === void 0 || configuredUrl === "" ? DEFAULT_BASE_URL : configuredUrl).replace(/\/+$/u, ""), cacheDirectory = path7.join(pi.pi.getAgentDir(), "cache", "forge-router"), auth = await pi.pi.discoverAuthStorage(pi.pi.getAgentDir()), startupKey;
   try {
     startupKey = await auth.keys.peek(PROVIDER);
   } finally {
     auth.close();
   }
-  let catalog = startupKey !== void 0 && startupKey !== "" ? await readStartupCatalog(cacheDirectory, baseUrl, startupKey) : void 0, registered = !1, refresh, register = (discover) => {
+  let catalog = startupKey !== void 0 && startupKey !== "" ? await readRouterCatalog(baseUrl, startupKey) ?? await readStartupCatalog(cacheDirectory, baseUrl, startupKey) : void 0, registered = !1, refresh, register = (discover) => {
     if (registered)
       pi.unregisterProvider(PROVIDER);
     pi.registerProvider(PROVIDER, {
@@ -14955,8 +15206,10 @@ var PROVIDER = "forge-router", DEFAULT_BASE_URL = "https://forge.forgeworkspace.
   }, discover = async (key) => {
     if (key === void 0 || key === "")
       throw Error("Log in to Forge Router with /login before discovering models.");
-    let updated = await discoverCatalog(baseUrl, key);
-    return await writeStartupCatalog(cacheDirectory, baseUrl, key, updated), catalog = updated, register(discover), updated;
+    let updated = await discoverCatalog(baseUrl, key), changed = JSON.stringify(catalog?.data) !== JSON.stringify(updated.data);
+    if (catalog = updated, changed)
+      register(discover);
+    return updated;
   };
   if (!catalog && startupKey !== void 0 && startupKey !== "")
     try {
@@ -14964,7 +15217,14 @@ var PROVIDER = "forge-router", DEFAULT_BASE_URL = "https://forge.forgeworkspace.
     } catch {}
   if (!registered)
     register(discover);
-  pi.on("session_start", (_event, ctx) => {
+  let refreshModels = async (ctx) => {
+    let key = await ctx.modelRegistry.getApiKeyForProvider(PROVIDER, void 0, { baseUrl });
+    if (key === void 0 || key === "")
+      return "Forge Router: not connected";
+    let updated = await discover(key);
+    return `Forge Router: ${mapOpenRouterModels(updated.data).length} models`;
+  };
+  return pi.on("session_start", (_event, ctx) => {
     ctx.setTimeout(() => {
       refresh ??= (async () => {
         try {
@@ -14981,12 +15241,29 @@ var PROVIDER = "forge-router", DEFAULT_BASE_URL = "https://forge.forgeworkspace.
         }
       })();
     }, 0);
-  });
+  }), refreshModels;
 }, router_default = forgeRouterPlugin;
 
 // src/index.ts
 async function forgePlugin(pi) {
-  registerForgeMcp(pi, import.meta.url), await Promise.all([forgeDesktopPlugin(pi), router_default(pi)]);
+  registerForgeMcp(pi, import.meta.url);
+  let [refreshDesktop, refreshRouter] = await Promise.all([
+    forgeDesktopPlugin(pi),
+    router_default(pi)
+  ]);
+  pi.registerCommand("forge-refresh", {
+    description: "Refresh Forge models and the shared cache",
+    handler: async (_args, ctx) => {
+      let results = await Promise.allSettled([refreshDesktop(), refreshRouter(ctx)]);
+      await ctx.modelRegistry.refreshRuntimeProviders("online");
+      let [desktop, router] = results;
+      ctx.ui.notify([
+        desktop.status === "fulfilled" ? `Forge Desktop: ${desktop.value} models` : "Forge Desktop refresh failed; cached models retained.",
+        router.status === "fulfilled" ? router.value : "Forge Router refresh failed; cached models retained."
+      ].join(`
+`), results.some((result) => result.status === "rejected") ? "warning" : "info");
+    }
+  });
 }
 export {
   forgePlugin as default

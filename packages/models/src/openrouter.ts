@@ -195,10 +195,10 @@ const fetchCatalog = async (): Promise<CatalogSnapshot> => {
   return { data: catalog.data.data, fetchedAt: Date.now() };
 };
 
-const readCatalog = async (): Promise<CatalogSnapshot> => {
+const readCatalog = async (refresh = false): Promise<CatalogSnapshot> => {
   const age = Date.now() - (snapshot?.fetchedAt ?? 0);
 
-  if (snapshot !== undefined && age >= 0 && age < CACHE_TTL_MS) {
+  if (!refresh && snapshot !== undefined && age >= 0 && age < CACHE_TTL_MS) {
     return snapshot;
   }
 
@@ -213,9 +213,7 @@ const readCatalog = async (): Promise<CatalogSnapshot> => {
   }
 };
 
-export const fetchModel = async (id: string): Promise<{ fetchedAt: number; model: Model }> => {
-  const catalog = await readCatalog();
-
+const catalogModel = (catalog: CatalogSnapshot, id: string) => {
   const model = catalog.data.find((entry) => record(entry)?.id === id);
 
   if (model === undefined) {
@@ -223,4 +221,19 @@ export const fetchModel = async (id: string): Promise<{ fetchedAt: number; model
   }
 
   return { fetchedAt: catalog.fetchedAt, model: normalizeModel(model) };
+};
+
+export const fetchModel = async (id: string): Promise<{ fetchedAt: number; model: Model }> =>
+  catalogModel(await readCatalog(), id);
+
+export const fetchModels = async (
+  ids: string[]
+): Promise<{ fetchedAt: number; model: Model }[]> => {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const catalog = await readCatalog(true);
+
+  return ids.map((id) => catalogModel(catalog, id));
 };

@@ -8,9 +8,11 @@ import { z } from "zod";
 
 import { CACHE_TTL_MS, modelName, ModelSchema } from "./model.ts";
 import type { Model } from "./model.ts";
-import { fetchModel } from "./openrouter.ts";
+import { fetchModel, fetchModels } from "./openrouter.ts";
 
 export type { Model } from "./model.ts";
+
+export { ModelSchema } from "./model.ts";
 
 const CachedModelSchema = z.object({ fetchedAt: z.number(), model: ModelSchema });
 
@@ -66,4 +68,15 @@ export const createModel = async (id: string): Promise<Model> => {
 
     throw error;
   }
+};
+
+export const refreshModels = async (ids: string[]): Promise<Model[]> => {
+  const entries = await fetchModels(ids);
+  await Promise.all(
+    entries.map(async (entry) => {
+      await Storage.setItem(cacheKey(entry.model.id), entry);
+    })
+  );
+
+  return entries.map(({ model }) => model);
 };

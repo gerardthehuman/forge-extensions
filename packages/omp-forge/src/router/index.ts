@@ -1,13 +1,9 @@
 import path from "node:path";
 
-import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+import { readRouterCatalog } from "@forge/models/catalogs";
+import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 
-import {
-  discoverCatalog,
-  fetchRouterCatalog,
-  readStartupCatalog,
-  writeStartupCatalog,
-} from "./catalog.ts";
+import { discoverCatalog, fetchRouterCatalog, readStartupCatalog } from "./catalog.ts";
 import type { DiscoveredCatalog } from "./catalog.ts";
 import { mapOpenRouterModels } from "./models.ts";
 
@@ -33,7 +29,8 @@ const forgeRouterPlugin = async (pi: ExtensionAPI) => {
 
   let catalog =
     startupKey !== undefined && startupKey !== ""
-      ? await readStartupCatalog(cacheDirectory, baseUrl, startupKey)
+      ? ((await readRouterCatalog(baseUrl, startupKey)) ??
+        (await readStartupCatalog(cacheDirectory, baseUrl, startupKey)))
       : undefined;
 
   let registered = false;
@@ -85,9 +82,12 @@ const forgeRouterPlugin = async (pi: ExtensionAPI) => {
     }
 
     const updated = await discoverCatalog(baseUrl, key);
-    await writeStartupCatalog(cacheDirectory, baseUrl, key, updated);
+    const changed = JSON.stringify(catalog?.data) !== JSON.stringify(updated.data);
     catalog = updated;
-    register(discover);
+
+    if (changed) {
+      register(discover);
+    }
 
     return updated;
   };
@@ -104,6 +104,18 @@ const forgeRouterPlugin = async (pi: ExtensionAPI) => {
   if (!registered) {
     register(discover);
   }
+
+  const refreshModels = async (ctx: ExtensionContext) => {
+    const key = await ctx.modelRegistry.getApiKeyForProvider(PROVIDER, undefined, { baseUrl });
+
+    if (key === undefined || key === "") {
+      return "Forge Router: not connected";
+    }
+
+    const updated = await discover(key);
+
+    return `Forge Router: ${mapOpenRouterModels(updated.data).length} models`;
+  };
 
   pi.on("session_start", (_event, ctx) => {
     ctx.setTimeout(() => {
@@ -131,6 +143,8 @@ const forgeRouterPlugin = async (pi: ExtensionAPI) => {
       })();
     }, 0);
   });
+
+  return refreshModels;
 };
 
 export default forgeRouterPlugin;

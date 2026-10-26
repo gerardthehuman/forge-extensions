@@ -2,8 +2,9 @@ import { createHash, randomUUID } from "node:crypto";
 import { readFile, mkdir, writeFile, rename, rm } from "node:fs/promises";
 import path from "node:path";
 
-import { createModel } from "@forge/models";
+import { ModelSchema } from "@forge/models";
 import type { Model } from "@forge/models";
+import { refreshRouterCatalog } from "@forge/models/catalogs";
 import { z } from "zod";
 
 import { mapOpenRouterModels } from "./models.ts";
@@ -21,6 +22,7 @@ export interface DiscoveredCatalog {
 const TimestampSchema = z.string().refine((value) => Number.isFinite(Date.parse(value)));
 
 const StartupCatalogSchema = RouterCatalogSchema.extend({
+  data: z.array(ModelSchema),
   discoveredAt: TimestampSchema,
   fetchedAt: TimestampSchema,
   version: z.literal(1),
@@ -49,7 +51,7 @@ export const readStartupCatalog = async (
     }
 
     const cached = parsed.data;
-    const data = await Promise.all(cached.data.map(async ({ id }) => await createModel(id)));
+    const { data } = cached;
     mapOpenRouterModels(data);
 
     return { data, discoveredAt: cached.discoveredAt, fetchedAt: cached.fetchedAt };
@@ -122,11 +124,12 @@ export const discoverCatalog = async (
   baseUrl: string,
   key: string | undefined
 ): Promise<DiscoveredCatalog> => {
-  const router = await fetchRouterCatalog(baseUrl, key);
-  const ids = [...new Set(router.data.map((model) => model.id))];
-  const data = await Promise.all(ids.map(async (id) => await createModel(id)));
-  mapOpenRouterModels(data);
-  const discoveredAt = new Date().toISOString();
+  if (key === undefined || key === "") {
+    throw new Error("Log in to Forge Router with /login before discovering models.");
+  }
 
-  return { data, discoveredAt, fetchedAt: discoveredAt };
+  const catalog = await refreshRouterCatalog(baseUrl, key);
+  mapOpenRouterModels(catalog.data);
+
+  return catalog;
 };

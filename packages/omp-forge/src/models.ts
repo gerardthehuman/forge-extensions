@@ -1,4 +1,4 @@
-import type { ForgeModel, ForgeModels } from "@forge/code-client";
+import type { DesktopModels } from "@forge/models/catalogs";
 import type { Effort, Model } from "@oh-my-pi/pi-ai";
 import type { ProviderModelConfig } from "@oh-my-pi/pi-coding-agent";
 
@@ -9,7 +9,7 @@ type ModelCost = Model["cost"];
 
 type Compatibility = NonNullable<ProviderModelConfig["compat"]>;
 
-type TokenCost = NonNullable<ForgeModel["cost"]>;
+type TokenCost = NonNullable<DesktopModels[string]["cost"]>;
 
 const EFFORT_PAYLOADS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
 
@@ -31,7 +31,7 @@ const tokenCost = (cost: TokenCost): ModelCost => ({
   output: cost.output,
 });
 
-const modelCost = (cost: ForgeModel["cost"]): ModelCost => {
+const modelCost = (cost: DesktopModels[string]["cost"]): ModelCost => {
   if (!cost) {
     throw new Error("Forge model is missing token pricing.");
   }
@@ -53,7 +53,7 @@ const modelCost = (cost: ForgeModel["cost"]): ModelCost => {
   return mapped;
 };
 
-export const mapForgeModels = (catalog: ForgeModels): ModelDefinition[] =>
+export const mapForgeModels = (catalog: DesktopModels): ModelDefinition[] =>
   Object.values(catalog).map((model) => {
     const effortValues =
       model.reasoning_options

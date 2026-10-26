@@ -1,7 +1,8 @@
-import { useForgeClient } from "@forge/code-client";
-import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+import { readDesktopCatalog, refreshDesktopCatalog } from "@forge/models/catalogs";
+import type { DesktopCatalog } from "@forge/models/catalogs";
+import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 
-import { localTimezone, readForgeUsage } from "./forge.ts";
+import { readForgeUsage } from "./forge.ts";
 import { mapForgeModels } from "./models.ts";
 
 const UNAVAILABLE =
@@ -9,29 +10,47 @@ const UNAVAILABLE =
 
 export default async function forgeDesktopPlugin(pi: ExtensionAPI) {
   let loadError: string | undefined;
+  let registered = false;
+  let signature: string | undefined;
+  let cached = false;
 
   const show = (content: string): void => {
     pi.sendMessage({ content, customType: "forge", display: true }, { triggerTurn: false });
   };
 
-  const loadModels = async (): Promise<void> => {
-    const forge = await useForgeClient();
-
-    const [providers, catalog] = await Promise.all([
-      forge.providers(),
-      forge.models({ tz: localTimezone() }),
-    ]);
-
-    const { options } = providers.forge;
+  const register = ({ options, models: catalog }: DesktopCatalog): number => {
     const models = mapForgeModels(catalog);
+    const updated = JSON.stringify({ catalog, options });
+
+    if (signature === updated) {
+      return models.length;
+    }
+
+    if (registered) {
+      pi.unregisterProvider("forge");
+    }
+
     pi.registerProvider("forge", {
       api: "openai-completions",
       apiKey: options.apiKey,
       // OMP appends /chat/completions itself; Forge does not use /v1.
       baseUrl: options.baseURL,
+      fetchDynamicModels: async () => await Promise.resolve(models),
       headers: options.headers,
       models,
     });
+    registered = true;
+    signature = updated;
+    loadError = undefined;
+
+    return models.length;
+  };
+
+  const refresh = async () => register(await refreshDesktopCatalog());
+
+  const update = async (ctx: ExtensionContext) => {
+    await refresh();
+    await ctx.modelRegistry.refreshRuntimeProviders("online");
   };
 
   pi.registerCommand("forge", {
@@ -59,14 +78,26 @@ export default async function forgeDesktopPlugin(pi: ExtensionAPI) {
     if (loadError !== undefined) {
       ctx.ui.notify(loadError, "error");
     }
+
+    if (cached) {
+      ctx.setTimeout(() => {
+        update(ctx).catch(() => {
+          ctx.ui.notify("Forge refresh failed; cached models retained.", "warning");
+        });
+      }, 0);
+    }
   });
 
   try {
-    await loadModels();
+    const catalog = await readDesktopCatalog();
+    cached = catalog !== undefined;
+    register(catalog ?? (await refreshDesktopCatalog()));
   } catch {
     // A missing gateway must not abort loading unrelated extensions. A fixed
     // message also avoids exposing credentials from endpoint/error payloads.
     loadError = UNAVAILABLE;
     console.error(`[forge] ${loadError}`);
   }
+
+  return refresh;
 }

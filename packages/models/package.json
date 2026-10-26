@@ -4,12 +4,14 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./catalogs": "./src/catalogs.ts"
   },
   "scripts": {
     "test": "bun test src"
   },
   "dependencies": {
+    "@forge/code-client": "file:../../vendor/forge-client.tgz",
     "env-paths": "4.0.0",
     "unstorage": "2.0.0-beta.0",
     "zod": "4.6.7"

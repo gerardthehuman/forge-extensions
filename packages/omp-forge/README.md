@@ -18,9 +18,13 @@ omp plugin install forge@omp-forge
 
 ## Commands
 
-| Command        | Description                                               |
-| -------------- | --------------------------------------------------------- |
-| `/forge usage` | Show available and total daily credits from Forge Desktop |
+| Command          | Description                                               |
+| ---------------- | --------------------------------------------------------- |
+| `/forge usage`   | Show available and total daily credits from Forge Desktop |
+| `/forge-refresh` | Refresh Desktop and Router models and their shared cache  |
+
+Saved model catalogs load before network discovery. Both plugins share the cache. Run
+`/forge-refresh` to update model availability, pricing, and limits in the current session.
 
 ## Forge Router
 

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, mock, spyOn, test } from "bun:test";
+import { afterEach, expect, mock, spyOn, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -63,20 +63,6 @@ const catalog = (): DiscoveredCatalog => ({
   data: [model()],
   discoveredAt: "2020-01-02T00:00:00.000Z",
   fetchedAt: "2020-01-01T00:00:00.000Z",
-});
-
-beforeEach(() => {
-  spyOn(models, "createModel").mockImplementation(async (id) => {
-    let enriched = model(id);
-
-    if (id.endsWith("/image")) {
-      enriched = mediaModel(id, "image");
-    } else if (id.endsWith("/video")) {
-      enriched = mediaModel(id, "video");
-    }
-
-    return await Promise.resolve(enriched);
-  });
 });
 
 test("round-trips stale startup catalogs privately with no credential in the snapshot", async () => {
@@ -169,11 +155,12 @@ test("accepts validated media-only snapshots without requiring chat metadata", a
   expect(await readStartupCatalog(directory, baseUrl, key)).toEqual(media);
 });
 
-test("ignores startup snapshots when shared enrichment fails", async () => {
+test("serves startup snapshots locally even when shared enrichment is unavailable", async () => {
   const directory = await cacheDirectory();
   await writeStartupCatalog(directory, baseUrl, key, catalog());
-  spyOn(models, "createModel").mockRejectedValue(new Error("Metadata unavailable"));
-  expect(await readStartupCatalog(directory, baseUrl, key)).toBeUndefined();
+  const enrich = spyOn(models, "createModel").mockRejectedValue(new Error("Metadata unavailable"));
+  expect(await readStartupCatalog(directory, baseUrl, key)).toEqual(catalog());
+  expect(enrich).not.toHaveBeenCalled();
 });
 
 test("validates router IDs without rejecting empty catalogs or future metadata", async () => {

@@ -1,4 +1,4 @@
-import type { ForgeModel, ForgeModels } from "@forge/code-client";
+import type { DesktopModels } from "@forge/models/catalogs";
 import type { Provider } from "@opencode/schema/provider";
 
 import { buildModel } from "./model-builder.ts";
@@ -6,7 +6,7 @@ import type { ContextTier, ModelDefinition } from "./model-builder.ts";
 
 const EFFORTS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
 
-const modelDefinition = (model: ForgeModel): ModelDefinition => {
+const modelDefinition = (model: DesktopModels[string]): ModelDefinition => {
   const efforts = EFFORTS.filter(
     (effort) =>
       model.reasoning_options?.some(
@@ -36,5 +36,5 @@ const modelDefinition = (model: ForgeModel): ModelDefinition => {
 };
 
 /** Maps the Forge broker's `/models` catalog onto OpenCode model definitions. */
-export const forgeModels = (catalog: ForgeModels, providerID: Provider.ID) =>
+export const forgeModels = (catalog: DesktopModels, providerID: Provider.ID) =>
   Object.values(catalog).map((model) => buildModel(providerID, modelDefinition(model)));

@@ -3,6 +3,12 @@ import { homedir } from "node:os";
 import path from "node:path";
 
 import { useForgeClient } from "@forge/code-client";
+import {
+  readDesktopCatalog,
+  readRouterCatalog,
+  refreshDesktopCatalog,
+} from "@forge/models/catalogs";
+import type { DesktopCatalog } from "@forge/models/catalogs";
 import { Plugin, Integration } from "@opencode/plugin";
 import type { Model } from "@opencode/plugin";
 import { Provider } from "@opencode/schema/provider";
@@ -31,6 +37,10 @@ const reportForgeError = (cause: unknown) => {
   console.error(`[forge] ${message(cause)}`);
 };
 
+const reportRouterError = (cause: unknown) => {
+  console.error(`[forge-router] ${message(cause)}`);
+};
+
 const reportEventError = (cause: unknown) => {
   console.error(`[forge-router] Event stream failed: ${message(cause)}`);
 };
@@ -54,6 +64,8 @@ export default Plugin.define({
     const forgeProviderID = Provider.ID.make("forge");
     const routerProviderID = Provider.ID.make(ROUTER_ID);
 
+    let routerConnection: Awaited<ReturnType<typeof ctx.integration.connection.active>>;
+
     const state: PluginState = {
       forge: undefined,
       forgeMcp: undefined,
@@ -76,7 +88,11 @@ export default Plugin.define({
         editor.add(state.forge);
       }
 
-      editor.add({ info: routerProviderInfo(), models: state.routerModels ?? [] });
+      editor.add({
+        info: routerProviderInfo(),
+        models: state.routerModels ?? [],
+        sourceConnection: routerConnection,
+      });
     });
 
     await ctx.mcp.transform((editor) => {
@@ -99,72 +115,110 @@ export default Plugin.define({
       });
     });
 
-    // A missing or restarted Forge must not abort loading other plugins, and a
-    // transient refresh failure must not drop a provider that worked moments ago.
-    const refreshForge = async () => {
-      try {
-        const forge = await useForgeClient();
-        // Forge budget days follow local midnight, not UTC.
-        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    let desktopCached = false;
+    let routerCached = false;
+    let forgeSignature: string | undefined;
 
-        const [providers, catalog, mcp] = await Promise.all([
-          forge.providers(),
-          forge.models({ tz }),
-          forge.mcp.servers(),
-        ]);
+    const publishForge = async ({ options, models }: DesktopCatalog) => {
+      const signature = JSON.stringify({ models, options });
 
-        const { options } = providers.forge;
-        state.forge = {
-          info: providerInfo(forgeProviderID, {
-            activation: "enabled",
-            headers: options.headers,
-            name: "Forge",
-            package: OPENAI_COMPATIBLE_PACKAGE,
-            settings: { apiKey: options.apiKey, baseURL: options.baseURL },
-          }),
-          models: forgeModels(catalog, forgeProviderID),
-        };
-        state.forgeMcp = { headers: mcp.forge.headers, url: mcp.forge.url };
-      } catch (error) {
-        if (!state.forge) {
-          console.error(`[forge] Forge is unavailable: ${message(error)}`);
-        }
+      if (forgeSignature === signature) {
+        return state.forge?.models.length ?? 0;
       }
 
+      state.forge = {
+        info: providerInfo(forgeProviderID, {
+          activation: "enabled",
+          headers: options.headers,
+          name: "Forge",
+          package: OPENAI_COMPATIBLE_PACKAGE,
+          settings: { apiKey: options.apiKey, baseURL: options.baseURL },
+        }),
+        models: forgeModels(models, forgeProviderID),
+      };
       await ctx.provider.reload();
+      forgeSignature = signature;
 
+      return state.forge.models.length;
+    };
+
+    const refreshForge = async () => await publishForge(await refreshDesktopCatalog());
+
+    const loadForge = async () => {
+      try {
+        const catalog = await readDesktopCatalog();
+        desktopCached = catalog !== undefined;
+        await publishForge(catalog ?? (await refreshDesktopCatalog()));
+      } catch {
+        console.error("[forge] Forge is unavailable; cached models retained.");
+      }
+    };
+
+    const refreshMcp = async () => {
+      const forge = await useForgeClient();
+      const mcp = await forge.mcp.servers();
+      state.forgeMcp = { headers: mcp.forge.headers, url: mcp.forge.url };
       await ctx.mcp.reload();
     };
 
-    const loadRouter = async () => {
+    const loadRouter = async (force: boolean) => {
       const connection = await ctx.integration.connection.active(ROUTER_ID);
 
       const key = routerKey(
         connection ? await ctx.integration.connection.resolve(connection) : undefined
       );
 
-      if (key === undefined || key === "" || key === state.routerKey) {
+      if (key === undefined || key === "") {
+        routerConnection = undefined;
+        state.routerKey = undefined;
+        state.routerModels = undefined;
+        await ctx.provider.reload();
+
         return;
       }
 
-      try {
-        const discovered = await discoverRouterModels(baseUrl, key);
-        state.routerModels = routerModels(discovered, routerProviderID);
-        state.routerKey = key;
+      if (!force && key === state.routerKey) {
+        return;
+      }
+
+      // Never publish one connection's inventory while another connection is loading.
+      if (key !== state.routerKey && state.routerKey !== undefined) {
+        state.routerModels = undefined;
+        state.routerKey = undefined;
         await ctx.provider.reload();
-      } catch (error) {
-        console.error(`[forge-router] ${message(error)}`);
+      }
+
+      const catalog = force ? undefined : await readRouterCatalog(baseUrl, key);
+      routerCached = catalog !== undefined;
+      const discovered = catalog?.data ?? (await discoverRouterModels(baseUrl, key));
+      const models = routerModels(discovered, routerProviderID);
+
+      const changed =
+        key !== state.routerKey ||
+        JSON.stringify(models) !== JSON.stringify(state.routerModels) ||
+        JSON.stringify(connection) !== JSON.stringify(routerConnection);
+
+      state.routerModels = models;
+      routerConnection = connection;
+      state.routerKey = key;
+
+      if (changed) {
+        await ctx.provider.reload();
       }
     };
 
     let routerRefresh: Promise<void> | undefined;
 
-    const refreshRouter = async () => {
+    const refreshRouter = async (force = false) => {
       if (routerRefresh !== undefined) {
-        await routerRefresh;
+        try {
+          await routerRefresh;
+        } catch {
+          // Recheck the active connection even if the preceding refresh failed.
+        }
       }
 
-      routerRefresh ??= loadRouter();
+      routerRefresh ??= loadRouter(force);
       const pending = routerRefresh;
 
       try {
@@ -185,6 +239,7 @@ export default Plugin.define({
         clearTimeout(refreshTimer);
         refreshTimer = setTimeout(() => {
           refreshForge().catch(reportForgeError);
+          refreshMcp().catch(reportForgeError);
         }, 500);
       });
     } catch (error) {
@@ -200,18 +255,52 @@ export default Plugin.define({
           event.type === "credential.updated" ||
           event.type === "credential.switched"
         ) {
-          await refreshRouter();
+          await refreshRouter().catch(reportRouterError);
         }
       }
     };
 
     observeIntegrationChanges().catch(reportEventError);
 
-    const refreshProviders = async () => {
-      await Promise.all([refreshForge(), refreshRouter()]);
-    };
+    await ctx.command.transform((editor) => {
+      editor.add({
+        description: "Refresh Forge models and the shared cache",
+        execute: async ({ sessionID }) => {
+          const results = await Promise.allSettled([refreshForge(), refreshRouter(true)]);
+          const [desktop, router] = results;
+          let routerMessage = "Forge Router: not connected";
 
-    refreshProviders().catch(reportForgeError);
+          if (router.status === "rejected") {
+            routerMessage = "Forge Router refresh failed; cached models retained.";
+          } else if (state.routerKey !== undefined) {
+            routerMessage = `Forge Router: ${state.routerModels?.length ?? 0} models`;
+          }
+
+          const text = [
+            desktop.status === "fulfilled"
+              ? `Forge Desktop: ${desktop.value} models`
+              : "Forge Desktop refresh failed; cached models retained.",
+            routerMessage,
+          ].join("\n");
+
+          await ctx.session.synthetic({ resume: false, sessionID, text });
+        },
+        name: "forge:refresh",
+      });
+    });
+
+    // Await the local snapshots so early sessions see the registered models.
+    await Promise.all([loadForge(), refreshRouter().catch(reportRouterError)]);
+
+    if (desktopCached) {
+      refreshForge().catch(reportForgeError);
+    }
+
+    if (routerCached) {
+      refreshRouter(true).catch(reportRouterError);
+    }
+
+    refreshMcp().catch(reportForgeError);
 
     return () => {
       controller.abort();
