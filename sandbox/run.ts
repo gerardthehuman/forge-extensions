@@ -8,7 +8,7 @@ const open = async (cwd: string, cmd: readonly string[], env: Record<string, str
   process.exitCode = await child.exited;
 };
 
-const [agent] = Bun.argv.slice(2);
+const [agent, ...args] = Bun.argv.slice(2);
 
 const Agents = {
   omp: {
@@ -34,4 +34,4 @@ if (agent !== "omp" && agent !== "opencode") {
 
 const config = Agents[agent];
 
-await open(`${import.meta.dir}/${agent}`, config.commands, config.env);
+await open(`${import.meta.dir}/${agent}`, [...config.commands, ...args], config.env);
