@@ -1,0 +1,21 @@
+{
+  "name": "@forge/omp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Forge Desktop models and MCP tools, plus Forge Router access for OMP",
+  "type": "module",
+  "scripts": {
+    "build": "bun build.ts",
+    "test": "bun test src"
+  },
+  "dependencies": {
+    "@forge/code-client": "file:../../vendor/forge-client.tgz",
+    "@forge/models": "workspace:*",
+    "zod": "4.6.7"
+  },
+  "omp": {
+    "extensions": [
+      "src/index.ts"
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@forge/opencode",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Forge providers and MCP for OpenCode 2",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "scripts": {
+    "build": "bun build.ts",
+    "test": "bun test src"
+  },
+  "dependencies": {
+    "@forge/code-client": "file:../../vendor/forge-client.tgz",
+    "@forge/models": "workspace:*",
+    "@opencode/plugin": "2.1.4",
+    "@opencode/schema": "2.1.4",
+    "zod": "4.6.7"
+  }
+}

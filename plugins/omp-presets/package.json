@@ -1,0 +1,12 @@
+{
+  "description": "Native model presets with session-only activation",
+  "name": "omp-presets",
+  "omp": {
+    "extensions": [
+      "index.js"
+    ]
+  },
+  "private": true,
+  "type": "module",
+  "version": "1.0.0"
+}

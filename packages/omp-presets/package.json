@@ -1,0 +1,19 @@
+{
+  "name": "omp-presets",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Native model presets with session-only activation",
+  "type": "module",
+  "scripts": {
+    "build": "bun build.ts",
+    "test": "bun test src"
+  },
+  "devDependencies": {
+    "zod": "4.6.7"
+  },
+  "omp": {
+    "extensions": [
+      "src/index.ts"
+    ]
+  }
+}

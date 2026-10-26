@@ -1,0 +1,10 @@
+{
+  "description": "Forge providers and MCP for OpenCode 2",
+  "exports": {
+    ".": "./index.js"
+  },
+  "name": "@forge/opencode",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0"
+}

@@ -1,0 +1,25 @@
+{
+  "name": "omp-forge",
+  "owner": {
+    "name": "Gerard Balaoro"
+  },
+  "metadata": {
+    "description": "Forge Extensions for OMP"
+  },
+  "plugins": [
+    {
+      "name": "forge",
+      "description": "Forge Desktop models and MCP tools, plus Forge Router access",
+      "version": "1.0.0",
+      "source": "./plugins/omp-forge",
+      "category": "development"
+    },
+    {
+      "name": "presets",
+      "description": "Native model presets with session-only activation, completion, and picker",
+      "version": "1.0.0",
+      "source": "./plugins/omp-presets",
+      "category": "development"
+    }
+  ]
+}

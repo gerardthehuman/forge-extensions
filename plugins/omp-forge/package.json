@@ -1,0 +1,12 @@
+{
+  "description": "Forge Desktop models and MCP tools, plus Forge Router access for OMP",
+  "name": "@forge/omp",
+  "omp": {
+    "extensions": [
+      "index.js"
+    ]
+  },
+  "private": true,
+  "type": "module",
+  "version": "1.0.0"
+}
