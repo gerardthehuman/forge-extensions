@@ -1,11 +1,12 @@
-async function open(cwd: string, cmd: readonly string[], env: Record<string, string>) {
+const open = async (cwd: string, cmd: readonly string[], env: Record<string, string>) => {
   const child = Bun.spawn([...cmd], {
     cwd,
     env: { ...process.env, ...env },
     stdio: ["inherit", "inherit", "inherit"],
   });
+
   process.exitCode = await child.exited;
-}
+};
 
 const [agent] = Bun.argv.slice(2);
 
@@ -27,9 +28,10 @@ const Agents = {
   },
 };
 
-if (!agent || !Object.hasOwn(Agents, agent)) {
-  throw new Error(`Usage: bun run sandbox [${Object.keys(Agents).join('|')}]`);
+if (agent !== "omp" && agent !== "opencode") {
+  throw new Error(`Usage: bun run sandbox [${Object.keys(Agents).join("|")}]`);
 }
 
-const config = Agents[agent as keyof typeof Agents];
+const config = Agents[agent];
+
 await open(`${import.meta.dir}/${agent}`, config.commands, config.env);
