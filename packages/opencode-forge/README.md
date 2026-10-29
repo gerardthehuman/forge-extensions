@@ -33,6 +33,13 @@ Run `/forge:usage` to show the current billing account and its available budget.
 shows the remaining and total daily dollar amounts. Project usage shows the available dollar amount
 because Forge does not expose the total project allocation.
 
+Run `/forge:cost` to show the costs that Forge reported for this session. The total excludes
+responses without a reported cost and does not include subagent sessions. OpenCode's built-in cost
+remains an estimate. If Forge reports a different model, the plugin adds a transcript notice. The
+notice stays outside model context, and the selected model does not change. The cost report lists
+detected model switches and responding models. The report includes only recorded requests. It flags
+recording failures and unreadable records when they are known.
+
 ## Billing
 
 Run `/forge:billing` in the TUI to choose Personal Budget or an available project budget. Each

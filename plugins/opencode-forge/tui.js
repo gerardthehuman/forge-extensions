@@ -1356,6 +1356,8 @@ var Class2 = class extends Class {
     if (props)
       assignProperties(this, props);
   }
+}, TaggedClass = (tag) => class extends Class2 {
+  _tag = tag;
 };
 var TaggedError2 = TaggedError;
 
@@ -7083,6 +7085,36 @@ var $ZodCheckMaxLength = /* @__PURE__ */ $constructor("$ZodCheckMaxLength", (ins
     });
   };
 });
+function handleCheckPropertyResult(result, payload, property) {
+  if (result.issues.length)
+    payload.issues.push(...prefixIssues(property, result.issues));
+}
+var $ZodCheckProperties = /* @__PURE__ */ $constructor("$ZodCheckProperties", (inst, def) => {
+  $ZodCheck.init(inst, def), hide(inst, Symbol.iterator, function* () {
+    yield inst;
+  });
+  let entries;
+  inst._zod.check = (payload) => {
+    if (payload.value == null) {
+      payload.issues.push({ expected: "object", code: "invalid_type", input: payload.value, inst });
+      return;
+    }
+    entries ?? (entries = Reflect.ownKeys(def.shape).map((key) => [key, def.shape[key]]));
+    let input = payload.value, proms;
+    for (let [key, schema] of entries) {
+      let result = schema._zod.run({ value: input[key], issues: [] }, {});
+      if (result instanceof Promise)
+        proms ?? (proms = []), proms.push(result.then((result) => handleCheckPropertyResult(result, payload, key)));
+      else
+        handleCheckPropertyResult(result, payload, key);
+    }
+    if (proms)
+      return Promise.all(proms).then(() => {
+        return;
+      });
+    return;
+  };
+});
 var $ZodCheckOverwrite = /* @__PURE__ */ $constructor("$ZodCheckOverwrite", (inst, def) => {
   $ZodCheck.init(inst, def), inst._zod.check = (payload) => {
     payload.value = def.tx(payload.value);
@@ -9281,6 +9313,13 @@ function _endsWith(suffix, params) {
     suffix
   });
 }
+function _properties(shape, params) {
+  return new $ZodCheckProperties({
+    check: "properties",
+    shape,
+    ...normalizeParams(params)
+  });
+}
 function _overwrite(tx) {
   return new $ZodCheckOverwrite({
     check: "overwrite",
@@ -11089,6 +11128,32 @@ function refine(fn, _params = {}) {
 }
 function superRefine(fn, params) {
   return _superRefine(fn, params);
+}
+var ZodInstanceOf = /* @__PURE__ */ $constructor("ZodInstanceOf", (inst, def) => {
+  ZodCustom.init(inst, def);
+}, {
+  properties(shape, params) {
+    return this.check(_properties(shape, params));
+  }
+});
+function _instanceof(cls, params = {}) {
+  let inst = new ZodInstanceOf({
+    type: "custom",
+    check: "custom",
+    fn: (data) => data instanceof cls,
+    abort: !0,
+    ...normalizeParams(params)
+  });
+  return inst._zod.bag.Class = cls, inst._zod.check = (payload) => {
+    if (!(payload.value instanceof cls))
+      payload.issues.push({
+        code: "invalid_type",
+        expected: cls.name,
+        input: payload.value,
+        inst,
+        path: [...inst._zod.def.path ?? []]
+      });
+  }, inst;
 }
 function json(params) {
   let jsonSchema = lazy(() => union2([string4(params), number4(), boolean3(), _null3(), array2(jsonSchema), record2(string4(), jsonSchema)]));

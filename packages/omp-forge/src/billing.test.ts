@@ -1,10 +1,11 @@
-/* oxlint-disable func-style, no-await-in-loop, anti-slop/no-reflect-apply -- Exercise the real extension against a partial host fixture. */
+/* oxlint-disable func-style, no-await-in-loop, anti-slop/no-reflect-apply, promise/prefer-await-to-callbacks -- Exercise the real extension against a partial host fixture. */
 import { expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { AuthStorage, registerCustomApi, streamSimple } from "@oh-my-pi/pi-ai";
+import type { Model } from "@oh-my-pi/pi-ai";
 import {
   AgentRegistry,
   ModelRegistry,
@@ -34,10 +35,15 @@ function fixture() {
   }[] = [];
 
   const warnings: string[] = [];
+  const noticeWaiters = new Map<string, ReturnType<typeof Promise.withResolvers<string>>>();
   const switches: { from: string; to: string }[] = [];
   let choice: number | undefined = 1;
   let denied = false;
   let writeFailure = false;
+  let idle = true;
+  let currentModel: Model | undefined;
+  let modelChanges = 0;
+  const availableModels = new Map<string, Model>();
   const selectors: { label: string; description: string; target: string }[][] = [];
 
   const handlers = new Map<
@@ -51,7 +57,17 @@ function fixture() {
     agent: { id: "Main", kind: "main" },
     cwd: "/test",
     hasUI: true,
+    isIdle: () => idle,
+    get model() {
+      return currentModel;
+    },
+    modelRegistry: {
+      find: (provider: string, id: string) => availableModels.get(`${provider}/${id}`),
+    },
     sessionManager: session,
+    setTimeout: (callback: () => void) => {
+      callback();
+    },
     ui: {
       notify: (message: string) => warnings.push(message),
       select: async (
@@ -92,6 +108,15 @@ function fixture() {
     sendMessage: (message: (typeof notices)[number], options: { triggerTurn: boolean }) => {
       expect(options.triggerTurn).toBe(false);
       notices.push(message);
+
+      noticeWaiters.get(message.details.text)?.resolve(message.details.text);
+      noticeWaiters.delete(message.details.text);
+    },
+    setModel: async (model: Model) => {
+      modelChanges += 1;
+      currentModel = model;
+
+      return await Promise.resolve(true);
     },
   };
 
@@ -137,8 +162,12 @@ function fixture() {
   handlers.get("session_start")?.({}, context);
 
   return {
+    addModel: (model: Model) => availableModels.set(`${model.provider}/${model.id}`, model),
     choose: (value: number | undefined) => {
       choice = value;
+    },
+    chooseModel: (model: Model) => {
+      currentModel = model;
     },
     context,
     deny: () => {
@@ -148,6 +177,7 @@ function fixture() {
       writeFailure = true;
     },
     handlers,
+    modelChanges: () => modelChanges,
     notices,
     run: async (args: string) => {
       const command = commands.get(`forge:${args}`);
@@ -160,7 +190,16 @@ function fixture() {
     },
     selectors,
     session,
+    setIdle: (value: boolean) => {
+      idle = value;
+    },
     switches,
+    waitForNotice: async (text: string) => {
+      const waiter = Promise.withResolvers<string>();
+      noticeWaiters.set(text, waiter);
+
+      return await waiter.promise;
+    },
     warnings,
   };
 }
@@ -310,6 +349,304 @@ test("OMP custom streaming preserves the native wire contract with one request p
     });
   } finally {
     await server.stop(true);
+    auth.close();
+  }
+});
+
+test("OMP uses each response's served model and reported cost", async () => {
+  const host = fixture();
+  registerCustomApi(BillingProvider.api, BillingProvider.streamSimple);
+  const auth = await AuthStorage.create(":memory:");
+
+  const registry = new ModelRegistry(auth, "/tmp/forge-test-no-models.yml", {
+    ignoreLocalModelConfig: true,
+  });
+
+  const baseline = registry.find("openai", "gpt-4o");
+
+  if (!baseline) {
+    throw new Error("Bundled OpenAI fixture model is missing");
+  }
+
+  try {
+    for (const provider of ["forge", "forge-router"]) {
+      registry.registerProvider(provider, {
+        ...BillingProvider,
+        apiKey: "test",
+        baseUrl: "https://example.invalid",
+        models: billingModels(provider, [
+          {
+            api: "openai-completions",
+            contextWindow: baseline.contextWindow ?? 1000,
+            cost: baseline.cost,
+            id: baseline.id,
+            input: baseline.input,
+            maxTokens: 100,
+            name: baseline.name,
+            reasoning: false,
+          },
+        ]),
+      });
+    }
+
+    const run = async (provider: string, served: string, cost?: number) => {
+      // oxlint-disable-next-line unicorn/no-array-method-this-argument -- ModelRegistry.find takes provider and model IDs.
+      const model = registry.find(provider, baseline.id);
+
+      if (!model) {
+        throw new Error("Fixture model is missing");
+      }
+
+      let observed = 0;
+
+      const chunks = [
+        {
+          choices: [{ delta: { content: "OK" }, finish_reason: null, index: 0 }],
+          id: "gen",
+          model: served,
+        },
+        {
+          choices: [{ delta: {}, finish_reason: "stop", index: 0 }],
+          id: "gen",
+          model: served,
+          usage: { completion_tokens: 20, cost, prompt_tokens: 100, total_tokens: 120 },
+        },
+      ];
+
+      const body = `${chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join("")}data: [DONE]\n\n`;
+
+      const message = await streamSimple(
+        model,
+        { messages: [] },
+        {
+          apiKey: "test",
+          fetch: async () =>
+            await Promise.resolve(
+              new Response(body, { headers: { "content-type": "text/event-stream" } })
+            ),
+          onSseEvent: () => {
+            observed += 1;
+          },
+          sessionId: host.session.getSessionId(),
+        }
+      ).result();
+
+      return { message, observed };
+    };
+
+    const [desktop, router] = await Promise.all([
+      run("forge", "vendor/desktop", 0),
+      run("forge-router", "vendor/router", 0.000001),
+    ]);
+
+    expect(desktop.message.upstreamModel).toBe("vendor/desktop");
+    expect(desktop.message.usage.cost.total).toBe(0);
+    expect(router.message.upstreamModel).toBe("vendor/router");
+    expect(router.message.usage.cost.total).toBe(0.000001);
+    expect(router.message.usage.cost.input + router.message.usage.cost.output).toBeCloseTo(
+      0.000001
+    );
+    expect(desktop.observed).toBeGreaterThan(0);
+    expect(router.observed).toBeGreaterThan(0);
+    expect(host.notices.map((notice) => notice.details.text)).toContain(
+      "Forge used vendor/desktop instead of gpt-4o."
+    );
+    expect(host.notices.map((notice) => notice.details.text)).toContain(
+      "Forge used vendor/router instead of gpt-4o."
+    );
+    expect(host.warnings).toEqual([]);
+
+    const missing = await run("forge", "gpt-4o");
+    expect(missing.message.usage.cost.total).toBeGreaterThan(0);
+    expect(host.notices.map((notice) => notice.details.text)).toContain(
+      "Forge did not report a cost. The displayed cost is an estimate."
+    );
+    expect(host.notices.at(-1)?.details.text).not.toContain("Forge used");
+
+    const requested = registry.find("forge", baseline.id);
+
+    if (!requested) {
+      throw new Error("Fixture model is missing");
+    }
+
+    const fallback = { ...requested, id: "vendor/desktop" };
+    host.chooseModel(requested);
+    host.addModel(fallback);
+    host.setIdle(false);
+    await run("forge", "vendor/desktop", 0);
+    expect(host.context.model?.id).toBe(baseline.id);
+    host.setIdle(true);
+    const firstNotice = host.waitForNotice("Forge used vendor/desktop instead of gpt-4o.");
+    host.handlers.get("agent_end")?.({}, host.context);
+    await firstNotice;
+    expect(host.context.model?.id).toBe(baseline.id);
+    expect(host.modelChanges()).toBe(0);
+
+    host.chooseModel(requested);
+    host.setIdle(false);
+    await run("forge", "vendor/desktop", 0);
+    const manual = { ...requested, id: "vendor/manual" };
+    host.chooseModel(manual);
+    host.setIdle(true);
+    const manualNotice = host.waitForNotice("Forge used vendor/desktop instead of gpt-4o.");
+    host.handlers.get("agent_end")?.({}, host.context);
+    await manualNotice;
+    expect(host.context.model?.id).toBe("vendor/manual");
+
+    host.chooseModel(requested);
+    host.setIdle(false);
+    await run("forge", "vendor/desktop", 0);
+    await run("forge", "gpt-4o", 0);
+    host.setIdle(true);
+    const latestNotice = host.waitForNotice("Forge used vendor/desktop instead of gpt-4o.");
+    host.handlers.get("agent_end")?.({}, host.context);
+    await latestNotice;
+    expect(host.context.model?.id).toBe(baseline.id);
+
+    host.chooseModel(requested);
+    host.setIdle(false);
+    await run("forge", "vendor/unlisted", 0);
+    host.setIdle(true);
+
+    const unavailableNotice = host.waitForNotice("Forge used vendor/unlisted instead of gpt-4o.");
+
+    host.handlers.get("agent_end")?.({}, host.context);
+    await unavailableNotice;
+    expect(host.context.model?.id).toBe(baseline.id);
+    expect(host.modelChanges()).toBe(0);
+
+    let attempts = 0;
+
+    const retried = await streamSimple(
+      requested,
+      { messages: [] },
+      {
+        apiKey: "test",
+        fetch: async () => {
+          attempts += 1;
+          const first = attempts === 1;
+
+          const chunk = {
+            choices: [{ delta: first ? {} : { content: "OK" }, finish_reason: "stop", index: 0 }],
+            id: "retry",
+            model: first ? "vendor/old" : "gpt-4o",
+            usage: { completion_tokens: first ? 0 : 20, cost: first ? 99 : 0, prompt_tokens: 100 },
+          };
+
+          return await Promise.resolve(
+            new Response(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`, {
+              headers: { "content-type": "text/event-stream" },
+            })
+          );
+        },
+        providerRetryWait: async () => {
+          await Promise.resolve();
+        },
+        sessionId: host.session.getSessionId(),
+      }
+    ).result();
+
+    expect(attempts).toBe(2);
+    expect(retried.upstreamModel).toBe("gpt-4o");
+    expect(retried.usage.cost.total).toBe(99);
+
+    let partialAttempts = 0;
+
+    const partialNotice = host.waitForNotice(
+      "Forge did not report costs for every attempt. The displayed cost excludes those attempts."
+    );
+
+    const partial = await streamSimple(
+      requested,
+      { messages: [] },
+      {
+        apiKey: "test",
+        fetch: async () => {
+          partialAttempts += 1;
+          const first = partialAttempts === 1;
+
+          const chunk = {
+            choices: [{ delta: first ? {} : { content: "OK" }, finish_reason: "stop", index: 0 }],
+            id: "partial-retry",
+            model: "gpt-4o",
+            usage: {
+              completion_tokens: first ? 0 : 20,
+              cost: first ? undefined : 0.5,
+              prompt_tokens: 100,
+            },
+          };
+
+          return await Promise.resolve(
+            new Response(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`, {
+              headers: { "content-type": "text/event-stream" },
+            })
+          );
+        },
+        providerRetryWait: async () => {
+          await Promise.resolve();
+        },
+        sessionId: host.session.getSessionId(),
+      }
+    ).result();
+
+    await partialNotice;
+    expect(partialAttempts).toBe(2);
+    expect(partial.usage.cost.total).toBe(0.5);
+
+    const controller = new AbortController();
+    const received = Promise.withResolvers<undefined>();
+    const noticeCount = host.notices.length;
+    host.chooseModel(requested);
+
+    const aborted = streamSimple(
+      requested,
+      { messages: [] },
+      {
+        apiKey: "test",
+        fetch: async () =>
+          await Promise.resolve(
+            new Response(
+              new ReadableStream<Uint8Array>({
+                start(stream) {
+                  stream.enqueue(
+                    new TextEncoder().encode(
+                      'data: {"id":"abort","model":"vendor/desktop","choices":[{"index":0,"delta":{"content":"partial"}}]}\n\n'
+                    )
+                  );
+                },
+              }),
+              { headers: { "content-type": "text/event-stream" } }
+            )
+          ),
+        onSseEvent: () => {
+          received.resolve(undefined);
+        },
+        sessionId: host.session.getSessionId(),
+        signal: controller.signal,
+      }
+    );
+
+    await received.promise;
+    controller.abort();
+    const interrupted = await aborted.result();
+    expect(interrupted.stopReason).toBe("aborted");
+    expect(host.context.model?.id).toBe(baseline.id);
+    expect(host.notices.slice(noticeCount).map((notice) => notice.details.text)).toContain(
+      "Forge did not report a cost. The displayed cost is an estimate."
+    );
+
+    const logged = host.notices.map((notice) => ({
+      ...notice,
+      role: "custom" as const,
+      timestamp: 0,
+    }));
+
+    expect(JSON.stringify(convertToLlm(logged))).not.toContain("vendor/desktop");
+    expect(host.handlers.get("context")?.({ messages: logged }, host.context)?.messages).toEqual(
+      []
+    );
+    expect(host.modelChanges()).toBe(0);
+  } finally {
     auth.close();
   }
 });

@@ -264,7 +264,11 @@ export async function registerBilling(
 
       const notices = new Set(
         history
-          .filter((message) => message.metadata?.forgeBillingNotice === true)
+          .filter(
+            (message) =>
+              message.metadata?.forgeBillingNotice === true ||
+              message.metadata?.forgeResponseNotice === true
+          )
           .map((message) => message.id)
       );
 

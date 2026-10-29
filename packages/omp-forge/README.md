@@ -28,6 +28,11 @@ Billing selections are saved with the session and apply to Desktop, Router, and 
 Billing notices appear in the transcript and stay outside model context. Project balances show the
 remaining amount because Forge does not provide their total allocation.
 
+OMP adds a transcript notice when Forge reports a different model. The notice stays outside model
+context. OMP does not change the selected model. OMP adds reported costs across retry attempts. If
+an attempt has no reported cost, the transcript identifies the displayed cost as incomplete or
+estimated. The input and output cost breakdown remains an estimate.
+
 Saved model catalogs load before network discovery. Both plugins share the cache. Run
 `/forge:refresh` to update model availability, pricing, and limits in the current session. Type
 `/forge:` to autocomplete the available commands.

@@ -3955,7 +3955,7 @@ async function useForgeClient(options = {}) {
 
 // src/billing.ts
 import { streamSimple } from "@oh-my-pi/pi-ai";
-import { AgentRegistry, Text } from "@oh-my-pi/pi-coding-agent";
+import { AgentRegistry as AgentRegistry3, Text } from "@oh-my-pi/pi-coding-agent";
 
 // node_modules/zod/v4/core/util.js
 function getEnumValues2(entries) {
@@ -8518,194 +8518,6 @@ function refine2(fn, _params = {}) {
 function superRefine2(fn, params) {
   return _superRefine2(fn, params);
 }
-// src/billing.ts
-var ChargeSchema = union2([literal("personal"), templateLiteral(["project:", uuid3()])]), BillingSchema = object2({ chargeTo: ChargeSchema }), BillingType = "forge-billing", BillingApi = "forge-billing-completions", Contexts = /* @__PURE__ */ new Map, ModelApis = /* @__PURE__ */ new Map;
-function billingSession(ctx) {
-  if (ctx.agent.kind === "main")
-    return ctx.sessionManager;
-  let agent = AgentRegistry.global().get(ctx.agent.id), visited = /* @__PURE__ */ new Set;
-  while (agent?.parentId !== void 0) {
-    if (visited.has(agent.id))
-      throw Error("Cannot resolve the Forge billing session: circular parent agents.");
-    visited.add(agent.id), agent = AgentRegistry.global().get(agent.parentId);
-  }
-  if (!agent?.session)
-    throw Error("Cannot resolve the parent Forge billing session.");
-  return agent.session.sessionManager;
-}
-function chargeTo(session) {
-  let entry = session.getEntries().findLast((candidate) => candidate.type === "custom" && candidate.customType === BillingType);
-  if (entry?.type !== "custom")
-    return "personal";
-  return BillingSchema.parse(entry.data).chargeTo;
-}
-async function billingAccount(forge, target) {
-  if (target === "personal") {
-    let usage = await forge.usage().value;
-    return {
-      available: usage.budget.remainingUsd,
-      name: "Personal",
-      total: usage.budget.dailyBudgetUsd
-    };
-  }
-  let project = await forge.projectBudget.state(target.slice(8));
-  return { available: project.remainingUsd, name: project.title, total: void 0 };
-}
-function usageMessage(account) {
-  let amount = `$${account.available.toFixed(2)}`;
-  return `Forge Billing: ${account.name}
-${account.total === void 0 ? `${amount} left` : `${amount} of $${account.total.toFixed(2)} left`}`;
-}
-function billingModels(provider, models) {
-  return models.map((model) => (ModelApis.set(`${provider}/${model.id}`, model.api ?? "openai-completions"), { ...model, api: BillingApi }));
-}
-function requestContext(options) {
-  let sessionId = options?.sessionId, active = AgentRegistry.global().list().find((agent) => agent.session?.sessionId === sessionId), ctx = (active?.session ? Contexts.get(active.session.sessionManager.getSessionId()) : void 0) ?? (sessionId === void 0 ? void 0 : Contexts.get(sessionId));
-  if (!ctx)
-    throw Error("Cannot resolve the Forge billing account for this request.");
-  return ctx;
-}
-var BillingProvider = {
-  api: BillingApi,
-  streamSimple: (model, context, options) => {
-    let ctx = requestContext(options), session = billingSession(ctx), target = chargeTo(session), title = (session.getSessionName() ?? "").slice(0, 200), api = ModelApis.get(`${model.provider}/${model.id}`);
-    if (api === void 0)
-      throw Error(`Cannot resolve the Forge model API: ${model.id}`);
-    return streamSimple({ ...model, api }, context, {
-      ...options,
-      headers: model.provider === "forge" ? {
-        ...options?.headers,
-        "x-forge-charge-to": target,
-        "x-forge-session-title": encodeURIComponent(title)
-      } : options?.headers,
-      loopGuard: { ...options?.loopGuard, enabled: !1 },
-      maxInFlightRequests: {},
-      onPayload: async (payload, originalModel, signal) => {
-        let changed = await options?.onPayload?.(payload, originalModel, signal);
-        if (model.provider !== "forge-router")
-          return changed;
-        let body = record(string4(), unknown2()).parse(changed ?? payload), usage = record(string4(), unknown2()).parse(body.forge_usage ?? {});
-        return { ...body, forge_usage: { ...usage, chargeTo: target, sessionTitle: title } };
-      }
-    });
-  }
-};
-function canSelectBilling(ctx) {
-  return ctx.hasUI && ctx.agent.kind === "main";
-}
-function registerBilling(pi, connect = useForgeClient) {
-  let show = (text) => {
-    pi.sendMessage({ content: [], customType: BillingType, details: { text }, display: !0 }, { triggerTurn: !1 });
-  };
-  pi.registerMessageRenderer(BillingType, (message) => new Text(message.details?.text ?? "", 0, 0)), pi.on("session_start", (_event, ctx) => {
-    Contexts.set(ctx.sessionManager.getSessionId(), ctx);
-  }), pi.on("session_switch", (_event, ctx) => {
-    Contexts.set(ctx.sessionManager.getSessionId(), ctx);
-  }), pi.on("before_agent_start", (_event, ctx) => {
-    Contexts.set(ctx.sessionManager.getSessionId(), ctx);
-  }), pi.on("context", (event, ctx) => (Contexts.set(ctx.sessionManager.getSessionId(), ctx), {
-    messages: event.messages.filter((message) => message.role !== "custom" || message.customType !== BillingType)
-  })), pi.on("session_shutdown", (_event, ctx) => {
-    Contexts.delete(ctx.sessionManager.getSessionId());
-  }), pi.registerCommand("forge:usage", {
-    description: "Show the current Forge billing account and remaining budget",
-    handler: async (_args, ctx) => {
-      try {
-        let forge = await connect();
-        show(usageMessage(await billingAccount(forge, chargeTo(billingSession(ctx)))));
-      } catch {
-        show("Forge balance unavailable. Start Forge Desktop and wait for its usage snapshot, then run /forge:usage again.");
-      }
-    }
-  });
-  let selecting = !1;
-  pi.registerCommand("forge:billing", {
-    description: "Choose Personal Budget or a project budget",
-    handler: async (_args, ctx) => {
-      if (selecting) {
-        ctx.ui.notify("A Forge billing selection is already open.", "info");
-        return;
-      }
-      selecting = !0;
-      try {
-        if (!canSelectBilling(ctx))
-          throw Error("Run /forge:billing in the main interactive session.");
-        let session = billingSession(ctx), sessionId = session.getSessionId(), previous = chargeTo(session), forge = await connect(), [context, usage] = await Promise.all([
-          forge.projectBudget.chargeContext(ctx.cwd),
-          forge.usage().value
-        ]), projects = context.enabled ? context.projects.filter((project) => project.canCharge && project.status === "active") : [], choices = [
-          {
-            description: `$${usage.budget.remainingUsd.toFixed(2)} available`,
-            label: "Personal Budget",
-            target: "personal"
-          },
-          ...projects.map((project) => ({
-            description: `$${project.remainingUsd.toFixed(2)} available`,
-            label: projects.filter((candidate) => candidate.title === project.title).length > 1 ? `${project.title} (${project.projectId})` : project.title,
-            target: ChargeSchema.parse(`project:${project.projectId}`)
-          }))
-        ].map((choice, index) => ({
-          ...choice,
-          label: `${index + 1}. ${choice.label}${choice.target === previous ? " (current)" : ""}`
-        })), answer = await ctx.ui.select("Forge Billing", choices, {
-          initialIndex: Math.max(0, choices.findIndex((choice) => choice.target === previous)),
-          selectionMarker: "radio"
-        }), selected = choices.find((choice) => choice.label === answer);
-        if (!selected || selected.target === previous)
-          return;
-        if (sessionId !== ctx.sessionManager.getSessionId())
-          throw Error("The session changed. Run /forge:billing again.");
-        let target = ChargeSchema.parse(selected.target), previousName = previous === "personal" ? "Personal" : await forge.projectBudget.state(previous.slice(8)).then((project) => project.title).catch(() => previous), account = await billingAccount(forge, target), projectId = target === "personal" ? previous.slice(8) : target.slice(8);
-        if (target !== "personal")
-          await forge.projectBudget.sessionSwitch({
-            from: previous,
-            projectId,
-            sessionId,
-            to: target
-          });
-        try {
-          pi.appendEntry(BillingType, { chargeTo: target });
-        } catch (error) {
-          if (target !== "personal")
-            try {
-              await forge.projectBudget.sessionSwitch({
-                from: target,
-                projectId,
-                sessionId,
-                to: previous
-              });
-            } catch (rollbackError) {
-              console.error("[forge] Could not record the billing rollback:", rollbackError);
-            }
-          throw error;
-        }
-        if (target === "personal")
-          try {
-            await forge.projectBudget.sessionSwitch({
-              from: previous,
-              projectId,
-              sessionId,
-              to: target
-            });
-          } catch (error) {
-            console.error("[forge] Billing switched to Personal, but recording the switch failed:", error);
-          }
-        show(`Forge Billing: ${previousName} → ${account.name}
-$${account.available.toFixed(2)} left`);
-      } catch (error) {
-        ctx.ui.notify(error instanceof Error ? error.message : "Forge billing is unavailable.", "error");
-      } finally {
-        selecting = !1;
-      }
-    }
-  });
-}
-
-// ../models/src/desktop-catalog.ts
-import { readFile as readFile3 } from "node:fs/promises";
-import { homedir as homedir3 } from "node:os";
-import path3 from "node:path";
-
 // ../../node_modules/.bun/zod@4.6.7/node_modules/zod/v4/core/util.js
 function getEnumValues3(entries) {
   let numericValues = Object.values(entries).filter((v) => typeof v === "number");
@@ -13741,6 +13553,370 @@ function time5(params) {
 function duration5(params) {
   return _isoDuration3(ZodISODuration3, params);
 }
+// ../models/src/response.ts
+var ModelSchema = string6().min(1).max(256).regex(/^[\w./:~-]+$/u), ChunkSchema = object3({
+  choices: array3(object3({ finish_reason: string6().nullish() })).optional().catch(void 0),
+  error: record2(string6(), unknown3()).optional().catch(void 0),
+  finish_reason: string6().nullish().catch(void 0),
+  model: ModelSchema.optional().catch(void 0),
+  usage: object3({ cost: number5().nonnegative().optional() }).optional().catch(void 0)
+}), TerminalReasons = /* @__PURE__ */ new Set([
+  "stop",
+  "tool_calls",
+  "function_call",
+  "length",
+  "content_filter",
+  "error"
+]);
+function responseObservation(headers) {
+  let routed = ModelSchema.safeParse(headers?.get("x-forge-model"));
+  return {
+    clamped: headers?.get("x-forge-model-clamped") === "1",
+    routedModel: routed.success ? routed.data : void 0
+  };
+}
+function observeResponseData(observation, data) {
+  try {
+    let parsed = ChunkSchema.safeParse(JSON.parse(data));
+    if (parsed.success)
+      return observation.model = parsed.data.model ?? observation.model, observation.cost = parsed.data.usage?.cost ?? observation.cost, parsed.data.error !== void 0 || parsed.data.finish_reason !== void 0 && parsed.data.finish_reason !== null && TerminalReasons.has(parsed.data.finish_reason) || (parsed.data.choices?.some((choice) => choice.finish_reason !== void 0 && choice.finish_reason !== null && TerminalReasons.has(choice.finish_reason)) ?? !1);
+  } catch {}
+  return !1;
+}
+function switchNotice(requested, observation) {
+  if (observation.clamped && observation.routedModel !== void 0 && observation.routedModel !== requested) {
+    if (observation.model === void 0)
+      return `Forge routed ${requested} to ${observation.routedModel}. The responding model is unknown.`;
+    if (observation.model !== observation.routedModel)
+      return `Forge routed ${requested} to ${observation.routedModel}. The response reported ${observation.model}.`;
+  }
+  if (observation.model !== void 0 && observation.model !== requested)
+    return `Forge used ${observation.model} instead of ${requested}.`;
+  return;
+}
+
+// src/responses.ts
+import { createAssistantMessageEventStream } from "@oh-my-pi/pi-ai";
+import { AgentRegistry as AgentRegistry2 } from "@oh-my-pi/pi-coding-agent";
+
+// src/session-context.ts
+import { AgentRegistry } from "@oh-my-pi/pi-coding-agent";
+var Contexts = /* @__PURE__ */ new Map;
+function requestContext(options) {
+  let sessionId = options?.sessionId, active = AgentRegistry.global().list().find((agent) => agent.session?.sessionId === sessionId), entry = (active?.session ? Contexts.get(active.session.sessionManager.getSessionId()) : void 0) ?? (sessionId === void 0 ? void 0 : Contexts.get(sessionId));
+  if (!entry)
+    throw Error("Cannot resolve the Forge billing account for this request.");
+  return entry;
+}
+function rememberContext(ctx, pi) {
+  let sessionId = ctx.sessionManager.getSessionId(), notices = Contexts.get(sessionId)?.notices ?? /* @__PURE__ */ new Set, entry = { ctx, notices, pi };
+  return Contexts.set(sessionId, entry), entry;
+}
+function isCurrentContext(entry, sessionId) {
+  let current = Contexts.get(sessionId);
+  return entry.ctx.sessionManager.getSessionId() === sessionId && current?.notices === entry.notices && current.pi === entry.pi;
+}
+function forgetContext(sessionId) {
+  Contexts.delete(sessionId);
+}
+
+// src/responses.ts
+var NoticeType = "forge-response";
+function responseAttempts() {
+  let current = responseObservation(), started = !1, received = !1, previous = [];
+  return {
+    begin() {
+      if (started)
+        previous.push(current);
+      current = responseObservation(), started = !0, received = !1;
+    },
+    headers(headers) {
+      if (received)
+        previous.push(current), current = responseObservation();
+      current = { ...current, ...responseObservation(headers) }, started = !0, received = !0;
+    },
+    observe(data) {
+      observeResponseData(current, data);
+    },
+    result() {
+      let attempts = started ? [...previous, current] : previous, costs = attempts.flatMap((attempt) => attempt.cost === void 0 ? [] : [attempt.cost]);
+      return {
+        current,
+        reportedCost: costs.length ? costs.reduce((sum, cost) => sum + cost, 0) : void 0,
+        unreported: attempts.length === 0 ? 1 : attempts.filter((attempt) => attempt.cost === void 0).length
+      };
+    }
+  };
+}
+async function settleNotices(entry, sessionId) {
+  try {
+    let session = AgentRegistry2.global().get(entry.ctx.agent.id)?.session;
+    if (session?.sessionManager.getSessionId() === sessionId)
+      await session.waitForIdle();
+    if (!entry.ctx.isIdle() || !isCurrentContext(entry, sessionId) || entry.notices.size === 0)
+      return;
+    let notices = [...entry.notices];
+    entry.notices.clear();
+    for (let text of notices)
+      entry.pi.sendMessage({ content: [], customType: NoticeType, details: { text }, display: !0 }, { triggerTurn: !1 });
+  } catch (error) {
+    console.error("[forge] Could not record response information:", error);
+  }
+}
+function reportedCost(message, cost) {
+  let current = message.usage.cost;
+  if (current.total === 0)
+    return {
+      ...message,
+      usage: {
+        ...message.usage,
+        cost: { cacheRead: 0, cacheWrite: 0, input: cost, output: 0, total: cost }
+      }
+    };
+  let scale = cost / current.total, components = {
+    cacheRead: current.cacheRead * scale,
+    cacheWrite: current.cacheWrite * scale,
+    input: current.input * scale,
+    output: current.output * scale
+  };
+  return { ...message, usage: { ...message.usage, cost: { ...components, total: cost } } };
+}
+function watchModelResponse(inner, entry, model, attempts) {
+  let result = createAssistantMessageEventStream(), sessionId = entry.ctx.sessionManager.getSessionId();
+  result.forwardLocalWorkFrom(inner);
+  let finishMessage = (original) => {
+    let observed = attempts.result(), message = original;
+    if (observed.current.model !== void 0)
+      message = { ...message, upstreamModel: observed.current.model };
+    if (observed.reportedCost !== void 0)
+      message = reportedCost(message, observed.reportedCost);
+    let notice = switchNotice(model.id, observed.current);
+    if (notice !== void 0)
+      entry.notices.add(notice);
+    if (observed.unreported > 0)
+      entry.notices.add(observed.reportedCost === void 0 ? "Forge did not report a cost. The displayed cost is an estimate." : "Forge did not report costs for every attempt. The displayed cost excludes those attempts.");
+    if (entry.notices.size && entry.ctx.isIdle())
+      settleNotices(entry, sessionId);
+    return message;
+  };
+  return (async () => {
+    try {
+      for await (let event of inner)
+        if (event.type === "done" || event.type === "error")
+          result.push(event.type === "done" ? { ...event, message: finishMessage(event.message) } : { ...event, error: finishMessage(event.error) });
+        else
+          result.push(event);
+      if (result.done)
+        result.end();
+      else
+        result.end(finishMessage(await inner.result()));
+    } catch (error) {
+      result.fail(error);
+    } finally {
+      result.forwardLocalWorkFrom(void 0);
+    }
+  })(), result;
+}
+
+// src/billing.ts
+var ChargeSchema = union2([literal("personal"), templateLiteral(["project:", uuid3()])]), BillingSchema = object2({ chargeTo: ChargeSchema }), BillingType = "forge-billing", BillingApi = "forge-billing-completions", ModelApis = /* @__PURE__ */ new Map;
+function billingSession(ctx) {
+  if (ctx.agent.kind === "main")
+    return ctx.sessionManager;
+  let agent = AgentRegistry3.global().get(ctx.agent.id), visited = /* @__PURE__ */ new Set;
+  while (agent?.parentId !== void 0) {
+    if (visited.has(agent.id))
+      throw Error("Cannot resolve the Forge billing session: circular parent agents.");
+    visited.add(agent.id), agent = AgentRegistry3.global().get(agent.parentId);
+  }
+  if (!agent?.session)
+    throw Error("Cannot resolve the parent Forge billing session.");
+  return agent.session.sessionManager;
+}
+function chargeTo(session) {
+  let entry = session.getEntries().findLast((candidate) => candidate.type === "custom" && candidate.customType === BillingType);
+  if (entry?.type !== "custom")
+    return "personal";
+  return BillingSchema.parse(entry.data).chargeTo;
+}
+async function billingAccount(forge, target) {
+  if (target === "personal") {
+    let usage = await forge.usage().value;
+    return {
+      available: usage.budget.remainingUsd,
+      name: "Personal",
+      total: usage.budget.dailyBudgetUsd
+    };
+  }
+  let project = await forge.projectBudget.state(target.slice(8));
+  return { available: project.remainingUsd, name: project.title, total: void 0 };
+}
+function usageMessage(account) {
+  let amount = `$${account.available.toFixed(2)}`;
+  return `Forge Billing: ${account.name}
+${account.total === void 0 ? `${amount} left` : `${amount} of $${account.total.toFixed(2)} left`}`;
+}
+function billingModels(provider, models) {
+  return models.map((model) => (ModelApis.set(`${provider}/${model.id}`, model.api ?? "openai-completions"), { ...model, api: BillingApi }));
+}
+var BillingProvider = {
+  api: BillingApi,
+  streamSimple: (model, context, options) => {
+    let entry = requestContext(options), { ctx } = entry, session = billingSession(ctx), target = chargeTo(session), title = (session.getSessionName() ?? "").slice(0, 200), api = ModelApis.get(`${model.provider}/${model.id}`);
+    if (api === void 0)
+      throw Error(`Cannot resolve the Forge model API: ${model.id}`);
+    let attempts = responseAttempts(), inner = streamSimple({ ...model, api }, context, {
+      ...options,
+      headers: model.provider === "forge" ? {
+        ...options?.headers,
+        "x-forge-charge-to": target,
+        "x-forge-session-title": encodeURIComponent(title)
+      } : options?.headers,
+      loopGuard: { ...options?.loopGuard, enabled: !1 },
+      maxInFlightRequests: {},
+      onPayload: async (payload, originalModel, signal) => {
+        attempts.begin();
+        let changed = await options?.onPayload?.(payload, originalModel, signal);
+        if (model.provider !== "forge-router")
+          return changed;
+        let body = record(string4(), unknown2()).parse(changed ?? payload), usage = record(string4(), unknown2()).parse(body.forge_usage ?? {});
+        return { ...body, forge_usage: { ...usage, chargeTo: target, sessionTitle: title } };
+      },
+      onResponse: async (response, originalModel, signal) => {
+        attempts.headers(new Headers(response.headers)), await options?.onResponse?.(response, originalModel, signal);
+      },
+      onSseEvent: (event, originalModel) => {
+        attempts.observe(event.data), options?.onSseEvent?.(event, originalModel);
+      }
+    });
+    if (api !== "openai-completions")
+      return inner;
+    return watchModelResponse(inner, entry, model, attempts);
+  }
+};
+function canSelectBilling(ctx) {
+  return ctx.hasUI && ctx.agent.kind === "main";
+}
+function registerBilling(pi, connect = useForgeClient) {
+  let show = (text) => {
+    pi.sendMessage({ content: [], customType: BillingType, details: { text }, display: !0 }, { triggerTurn: !1 });
+  };
+  pi.registerMessageRenderer(BillingType, (message) => new Text(message.details?.text ?? "", 0, 0)), pi.registerMessageRenderer(NoticeType, (message) => new Text(message.details?.text ?? "", 0, 0)), pi.on("session_start", (_event, ctx) => {
+    rememberContext(ctx, pi);
+  }), pi.on("session_switch", (_event, ctx) => {
+    rememberContext(ctx, pi);
+  }), pi.on("before_agent_start", (_event, ctx) => {
+    rememberContext(ctx, pi);
+  }), pi.on("agent_end", (event, ctx) => {
+    if (event.willContinue === !0)
+      return;
+    let sessionId = ctx.sessionManager.getSessionId(), entry = rememberContext(ctx, pi);
+    ctx.setTimeout(() => {
+      settleNotices(entry, sessionId);
+    }, 0);
+  }), pi.on("context", (event, ctx) => (rememberContext(ctx, pi), {
+    messages: event.messages.filter((message) => message.role !== "custom" || message.customType !== BillingType && message.customType !== NoticeType)
+  })), pi.on("session_shutdown", (_event, ctx) => {
+    forgetContext(ctx.sessionManager.getSessionId());
+  }), pi.registerCommand("forge:usage", {
+    description: "Show the current Forge billing account and remaining budget",
+    handler: async (_args, ctx) => {
+      try {
+        let forge = await connect();
+        show(usageMessage(await billingAccount(forge, chargeTo(billingSession(ctx)))));
+      } catch {
+        show("Forge balance unavailable. Start Forge Desktop and wait for its usage snapshot, then run /forge:usage again.");
+      }
+    }
+  });
+  let selecting = !1;
+  pi.registerCommand("forge:billing", {
+    description: "Choose Personal Budget or a project budget",
+    handler: async (_args, ctx) => {
+      if (selecting) {
+        ctx.ui.notify("A Forge billing selection is already open.", "info");
+        return;
+      }
+      selecting = !0;
+      try {
+        if (!canSelectBilling(ctx))
+          throw Error("Run /forge:billing in the main interactive session.");
+        let session = billingSession(ctx), sessionId = session.getSessionId(), previous = chargeTo(session), forge = await connect(), [context, usage] = await Promise.all([
+          forge.projectBudget.chargeContext(ctx.cwd),
+          forge.usage().value
+        ]), projects = context.enabled ? context.projects.filter((project) => project.canCharge && project.status === "active") : [], choices = [
+          {
+            description: `$${usage.budget.remainingUsd.toFixed(2)} available`,
+            label: "Personal Budget",
+            target: "personal"
+          },
+          ...projects.map((project) => ({
+            description: `$${project.remainingUsd.toFixed(2)} available`,
+            label: projects.filter((candidate) => candidate.title === project.title).length > 1 ? `${project.title} (${project.projectId})` : project.title,
+            target: ChargeSchema.parse(`project:${project.projectId}`)
+          }))
+        ].map((choice, index) => ({
+          ...choice,
+          label: `${index + 1}. ${choice.label}${choice.target === previous ? " (current)" : ""}`
+        })), answer = await ctx.ui.select("Forge Billing", choices, {
+          initialIndex: Math.max(0, choices.findIndex((choice) => choice.target === previous)),
+          selectionMarker: "radio"
+        }), selected = choices.find((choice) => choice.label === answer);
+        if (!selected || selected.target === previous)
+          return;
+        if (sessionId !== ctx.sessionManager.getSessionId())
+          throw Error("The session changed. Run /forge:billing again.");
+        let target = ChargeSchema.parse(selected.target), previousName = previous === "personal" ? "Personal" : await forge.projectBudget.state(previous.slice(8)).then((project) => project.title).catch(() => previous), account = await billingAccount(forge, target), projectId = target === "personal" ? previous.slice(8) : target.slice(8);
+        if (target !== "personal")
+          await forge.projectBudget.sessionSwitch({
+            from: previous,
+            projectId,
+            sessionId,
+            to: target
+          });
+        try {
+          pi.appendEntry(BillingType, { chargeTo: target });
+        } catch (error) {
+          if (target !== "personal")
+            try {
+              await forge.projectBudget.sessionSwitch({
+                from: target,
+                projectId,
+                sessionId,
+                to: previous
+              });
+            } catch (rollbackError) {
+              console.error("[forge] Could not record the billing rollback:", rollbackError);
+            }
+          throw error;
+        }
+        if (target === "personal")
+          try {
+            await forge.projectBudget.sessionSwitch({
+              from: previous,
+              projectId,
+              sessionId,
+              to: target
+            });
+          } catch (error) {
+            console.error("[forge] Billing switched to Personal, but recording the switch failed:", error);
+          }
+        show(`Forge Billing: ${previousName} → ${account.name}
+$${account.available.toFixed(2)} left`);
+      } catch (error) {
+        ctx.ui.notify(error instanceof Error ? error.message : "Forge billing is unavailable.", "error");
+      } finally {
+        selecting = !1;
+      }
+    }
+  });
+}
+
+// ../models/src/desktop-catalog.ts
+import { readFile as readFile3 } from "node:fs/promises";
+import { homedir as homedir3 } from "node:os";
+import path3 from "node:path";
+
 // ../models/src/catalog-cache.ts
 import { createHash, randomUUID as randomUUID2 } from "node:crypto";
 import { mkdir as mkdir2, readFile as readFile2, rename as rename2, rm as rm2, writeFile as writeFile2 } from "node:fs/promises";
@@ -14651,7 +14827,7 @@ var CACHE_TTL_MS = 86400000, modelName = (name) => name.replace(/^[^:]+:\s+/u, "
   cacheWrite: RateSchema2,
   input: RateSchema2,
   output: RateSchema2
-}), ModelSchema = object3({
+}), ModelSchema2 = object3({
   contextWindow: LimitSchema.optional(),
   cost: TokenCostSchema.extend({
     tiers: array3(TokenCostSchema.extend({ inputThreshold: LimitSchema }))
@@ -14781,7 +14957,7 @@ var fetchModels = async (ids) => {
 };
 
 // ../models/src/index.ts
-var CachedModelSchema = object3({ fetchedAt: number5(), model: ModelSchema }), Storage = createStorage({
+var CachedModelSchema = object3({ fetchedAt: number5(), model: ModelSchema2 }), Storage = createStorage({
   driver: driver2({
     atomic: !0,
     base: path4.join(envPaths("forge-extensions", { suffix: "" }).cache, "models")
@@ -14796,7 +14972,7 @@ var refreshModels = async (ids) => {
 
 // ../models/src/router-catalog.ts
 var RouterResponseSchema = object3({ data: array3(object3({ id: string6().min(1) })) }), RouterCatalogSchema = object3({
-  data: array3(ModelSchema),
+  data: array3(ModelSchema2),
   discoveredAt: exports_iso2.datetime(),
   fetchedAt: exports_iso2.datetime(),
   version: literal2(1)
@@ -15082,7 +15258,7 @@ var EFFORT_PAYLOADS2 = ["minimal", "low", "medium", "high", "xhigh", "max"], isE
 
 // src/router/catalog.ts
 var RouterCatalogSchema2 = object2({ data: array2(object2({ id: string4().min(1) })) }), TimestampSchema = string4().refine((value) => Number.isFinite(Date.parse(value))), StartupCatalogSchema = RouterCatalogSchema2.extend({
-  data: array2(ModelSchema),
+  data: array2(ModelSchema2),
   discoveredAt: TimestampSchema,
   fetchedAt: TimestampSchema,
   version: literal(1)

@@ -79,6 +79,7 @@ export default Plugin.define({
   setup(ctx) {
     const controller = new AbortController();
     let pending = false;
+
     ctx.keymap.layer(() => ({
       commands: [
         {

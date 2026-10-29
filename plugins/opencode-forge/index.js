@@ -5075,6 +5075,36 @@ var $ZodCheckMaxLength2 = /* @__PURE__ */ $constructor2("$ZodCheckMaxLength", (i
     });
   };
 });
+function handleCheckPropertyResult(result, payload, property) {
+  if (result.issues.length)
+    payload.issues.push(...prefixIssues2(property, result.issues));
+}
+var $ZodCheckProperties = /* @__PURE__ */ $constructor2("$ZodCheckProperties", (inst, def) => {
+  $ZodCheck2.init(inst, def), hide(inst, Symbol.iterator, function* () {
+    yield inst;
+  });
+  let entries;
+  inst._zod.check = (payload) => {
+    if (payload.value == null) {
+      payload.issues.push({ expected: "object", code: "invalid_type", input: payload.value, inst });
+      return;
+    }
+    entries ?? (entries = Reflect.ownKeys(def.shape).map((key) => [key, def.shape[key]]));
+    let input = payload.value, proms;
+    for (let [key, schema] of entries) {
+      let result = schema._zod.run({ value: input[key], issues: [] }, {});
+      if (result instanceof Promise)
+        proms ?? (proms = []), proms.push(result.then((result) => handleCheckPropertyResult(result, payload, key)));
+      else
+        handleCheckPropertyResult(result, payload, key);
+    }
+    if (proms)
+      return Promise.all(proms).then(() => {
+        return;
+      });
+    return;
+  };
+});
 var $ZodCheckOverwrite2 = /* @__PURE__ */ $constructor2("$ZodCheckOverwrite", (inst, def) => {
   $ZodCheck2.init(inst, def), inst._zod.check = (payload) => {
     payload.value = def.tx(payload.value);
@@ -7273,6 +7303,13 @@ function _endsWith2(suffix, params) {
     suffix
   });
 }
+function _properties(shape, params) {
+  return new $ZodCheckProperties({
+    check: "properties",
+    shape,
+    ...normalizeParams2(params)
+  });
+}
 function _overwrite2(tx) {
   return new $ZodCheckOverwrite2({
     check: "overwrite",
@@ -9081,6 +9118,32 @@ function refine2(fn, _params = {}) {
 }
 function superRefine2(fn, params) {
   return _superRefine2(fn, params);
+}
+var ZodInstanceOf = /* @__PURE__ */ $constructor2("ZodInstanceOf", (inst, def) => {
+  ZodCustom2.init(inst, def);
+}, {
+  properties(shape, params) {
+    return this.check(_properties(shape, params));
+  }
+});
+function _instanceof(cls, params = {}) {
+  let inst = new ZodInstanceOf({
+    type: "custom",
+    check: "custom",
+    fn: (data) => data instanceof cls,
+    abort: !0,
+    ...normalizeParams2(params)
+  });
+  return inst._zod.bag.Class = cls, inst._zod.check = (payload) => {
+    if (!(payload.value instanceof cls))
+      payload.issues.push({
+        code: "invalid_type",
+        expected: cls.name,
+        input: payload.value,
+        inst,
+        path: [...inst._zod.def.path ?? []]
+      });
+  }, inst;
 }
 function json(params) {
   let jsonSchema = lazy(() => union2([string4(params), number4(), boolean4(), _null5(), array2(jsonSchema), record(string4(), jsonSchema)]));
@@ -11443,6 +11506,219 @@ var isArrayNonEmpty2 = isArrayNonEmpty, isReadonlyArrayNonEmpty = isArrayNonEmpt
 var empty2 = () => [];
 var map2 = /* @__PURE__ */ dual(2, (self, f) => self.map(f));
 
+// ../../node_modules/.bun/effect@4.0.1/node_modules/effect/dist/Duration.js
+var TypeId4 = "~effect/Duration", bigint0 = /* @__PURE__ */ BigInt(0), bigint1 = /* @__PURE__ */ BigInt(1), bigint22 = /* @__PURE__ */ BigInt(2), bigint10 = /* @__PURE__ */ BigInt(10);
+var bigint1e3 = /* @__PURE__ */ BigInt(1000);
+var roundTiesAwayFromZero = (input) => BigInt(input < 0 ? Math.ceil(input - 0.5) : Math.floor(input + 0.5)), roundMillisToNanos = (millis) => roundTiesAwayFromZero(millis * 1e6), parseNanos = (input, scale) => {
+  let decimalIndex = input.indexOf(".");
+  if (decimalIndex === -1)
+    return BigInt(input) * scale;
+  let isNegative = input[0] === "-", fractional = input.slice(decimalIndex + 1), fractionalScale = bigint10 ** BigInt(fractional.length), scaled = (BigInt(input.slice(isNegative ? 1 : 0, decimalIndex)) * fractionalScale + BigInt(fractional)) * scale, rounded = scaled / fractionalScale + (scaled % fractionalScale * bigint22 >= fractionalScale ? bigint1 : bigint0);
+  return isNegative ? -rounded : rounded;
+};
+var DURATION_REGEXP = /^(-?\d+(?:\.\d+)?)\s+(nanos?|micros?|millis?|seconds?|minutes?|hours?|days?|weeks?)$/, fromInputUnsafe = (input) => {
+  switch (typeof input) {
+    case "number":
+      return millis(input);
+    case "bigint":
+      return nanos(input);
+    case "string": {
+      if (input === "Infinity")
+        return infinity;
+      if (input === "-Infinity")
+        return negativeInfinity;
+      let match = DURATION_REGEXP.exec(input);
+      if (!match)
+        break;
+      let [_, valueStr, unit] = match;
+      if (unit === "nano" || unit === "nanos")
+        return nanos(parseNanos(valueStr, bigint1));
+      if (unit === "micro" || unit === "micros")
+        return nanos(parseNanos(valueStr, bigint1e3));
+      let value = Number(valueStr);
+      switch (unit) {
+        case "milli":
+        case "millis":
+          return millis(value);
+        case "second":
+        case "seconds":
+          return seconds(value);
+        case "minute":
+        case "minutes":
+          return minutes(value);
+        case "hour":
+        case "hours":
+          return hours(value);
+        case "day":
+        case "days":
+          return days(value);
+        case "week":
+        case "weeks":
+          return weeks(value);
+      }
+      break;
+    }
+    case "object": {
+      if (input === null)
+        break;
+      if (TypeId4 in input)
+        return input;
+      if (Array.isArray(input)) {
+        if (input.length !== 2 || !input.every(isNumber))
+          return invalid(input);
+        if (Number.isNaN(input[0]) || Number.isNaN(input[1]))
+          return zero;
+        if (input[0] === -1 / 0 || input[1] === -1 / 0)
+          return negativeInfinity;
+        if (input[0] === 1 / 0 || input[1] === 1 / 0)
+          return infinity;
+        return make4(roundTiesAwayFromZero(input[0] * 1e9 + input[1]));
+      }
+      let obj = input, millis = 0;
+      if (obj.weeks)
+        millis += obj.weeks * 604800000;
+      if (obj.days)
+        millis += obj.days * 86400000;
+      if (obj.hours)
+        millis += obj.hours * 3600000;
+      if (obj.minutes)
+        millis += obj.minutes * 60000;
+      if (obj.seconds)
+        millis += obj.seconds * 1000;
+      if (obj.milliseconds)
+        millis += obj.milliseconds;
+      if (!obj.microseconds && !obj.nanoseconds)
+        return make4(millis);
+      return make4(roundTiesAwayFromZero(millis * 1e6 + (obj.microseconds ?? 0) * 1000 + (obj.nanoseconds ?? 0)));
+    }
+  }
+  return invalid(input);
+}, invalid = (input) => {
+  throw Error(`Invalid Input: ${input}`);
+};
+var zeroDurationValue = {
+  _tag: "Millis",
+  millis: 0
+}, infinityDurationValue = {
+  _tag: "Infinity"
+}, negativeInfinityDurationValue = {
+  _tag: "NegativeInfinity"
+}, DurationProto = {
+  [TypeId4]: TypeId4,
+  [symbol]() {
+    switch (this.value._tag) {
+      case "Millis": {
+        let nanos = this.value.millis * 1e6;
+        return Number.isFinite(nanos) ? hash(roundTiesAwayFromZero(nanos)) : number5(this.value.millis);
+      }
+      case "Nanos":
+        return hash(this.value.nanos);
+      default:
+        return structure(this.value);
+    }
+  },
+  [symbol2](that) {
+    return isDuration(that) && equals2(this, that);
+  },
+  toString() {
+    switch (this.value._tag) {
+      case "Infinity":
+        return "Infinity";
+      case "NegativeInfinity":
+        return "-Infinity";
+      case "Nanos":
+        return `${this.value.nanos} nanos`;
+      case "Millis":
+        return `${this.value.millis} millis`;
+    }
+  },
+  toJSON() {
+    switch (this.value._tag) {
+      case "Millis":
+        return {
+          _id: "Duration",
+          _tag: "Millis",
+          millis: this.value.millis
+        };
+      case "Nanos":
+        return {
+          _id: "Duration",
+          _tag: "Nanos",
+          nanos: String(this.value.nanos)
+        };
+      case "Infinity":
+        return {
+          _id: "Duration",
+          _tag: "Infinity"
+        };
+      case "NegativeInfinity":
+        return {
+          _id: "Duration",
+          _tag: "NegativeInfinity"
+        };
+    }
+  },
+  [NodeInspectSymbol]() {
+    return this.toJSON();
+  },
+  pipe() {
+    return pipeArguments(this, arguments);
+  }
+}, make4 = (input) => {
+  let duration = Object.create(DurationProto);
+  if (typeof input === "number")
+    if (isNaN(input) || input === 0 || Object.is(input, -0))
+      duration.value = zeroDurationValue;
+    else if (!Number.isFinite(input))
+      duration.value = input > 0 ? infinityDurationValue : negativeInfinityDurationValue;
+    else if (!Number.isInteger(input))
+      duration.value = {
+        _tag: "Nanos",
+        nanos: roundMillisToNanos(input)
+      };
+    else
+      duration.value = {
+        _tag: "Millis",
+        millis: input
+      };
+  else if (input === bigint0)
+    duration.value = zeroDurationValue;
+  else
+    duration.value = {
+      _tag: "Nanos",
+      nanos: input
+    };
+  return duration;
+}, isDuration = (u) => hasProperty(u, TypeId4);
+var zero = /* @__PURE__ */ make4(0), infinity = /* @__PURE__ */ make4(1 / 0), negativeInfinity = /* @__PURE__ */ make4(-1 / 0), nanos = (nanos) => make4(nanos);
+var millis = (millis) => make4(millis), seconds = (seconds) => make4(seconds * 1000), minutes = (minutes) => make4(minutes * 60000), hours = (hours) => make4(hours * 3600000), days = (days) => make4(days * 86400000), weeks = (weeks) => make4(weeks * 604800000);
+var toNanosUnsafe = (input) => {
+  let self = fromInputUnsafe(input);
+  switch (self.value._tag) {
+    case "Infinity":
+    case "NegativeInfinity":
+      throw Error("Cannot convert infinite duration to nanos");
+    case "Nanos":
+      return self.value.nanos;
+    case "Millis":
+      return roundMillisToNanos(self.value.millis);
+  }
+};
+var matchPair = /* @__PURE__ */ dual(3, (self, that, options) => {
+  if (self.value._tag === "Infinity" || self.value._tag === "NegativeInfinity" || that.value._tag === "Infinity" || that.value._tag === "NegativeInfinity")
+    return options.onInfinity(self, that);
+  if (self.value._tag === "Millis")
+    return that.value._tag === "Millis" ? options.onMillis(self.value.millis, that.value.millis) : options.onNanos(toNanosUnsafe(self), that.value.nanos);
+  else
+    return options.onNanos(self.value.nanos, toNanosUnsafe(that));
+});
+var Equivalence = (self, that) => matchPair(self, that, {
+  onMillis: (self, that) => self === that,
+  onNanos: (self, that) => self === that,
+  onInfinity: (self, that) => self.value._tag === that.value._tag
+});
+var equals2 = /* @__PURE__ */ dual(2, (self, that) => Equivalence(self, that));
+
 // ../../node_modules/.bun/effect@4.0.1/node_modules/effect/dist/Scheduler.js
 var Scheduler = /* @__PURE__ */ Reference("effect/Scheduler", {
   fiberCached: !0,
@@ -11550,6 +11826,8 @@ var Class2 = class extends Class {
     if (props)
       assignProperties(this, props);
   }
+}, TaggedClass = (tag) => class extends Class2 {
+  _tag = tag;
 };
 var TaggedError2 = TaggedError;
 
@@ -12306,8 +12584,8 @@ var void_2 = exitVoid;
 var isSuccess3 = exitIsSuccess;
 
 // ../../node_modules/.bun/effect@4.0.1/node_modules/effect/dist/internal/dateTime.js
-var TypeId4 = "~effect/DateTime", TimeZoneTypeId = "~effect/DateTime/TimeZone", Proto2 = {
-  [TypeId4]: TypeId4,
+var TypeId5 = "~effect/DateTime", TimeZoneTypeId = "~effect/DateTime/TimeZone", Proto2 = {
+  [TypeId5]: TypeId5,
   pipe() {
     return pipeArguments(this, arguments);
   },
@@ -12385,7 +12663,7 @@ var TypeId4 = "~effect/DateTime", TimeZoneTypeId = "~effect/DateTime/TimeZone", 
     };
   }
 };
-var isDateTime = (u) => hasProperty(u, TypeId4);
+var isDateTime = (u) => hasProperty(u, TypeId5);
 var isTimeZone = (u) => hasProperty(u, TimeZoneTypeId);
 var isUtc = (self) => self._tag === "Utc";
 var makeUtc = (epochMillis) => {
@@ -12414,7 +12692,7 @@ var makeUtc = (epochMillis) => {
     return fromDateUnsafe(/* @__PURE__ */ new Date(input + "Z"));
   return fromDateUnsafe(new Date(input));
 }, hasZone = (input) => /Z|GMT|[+-]\d{2}$|[+-]\d{2}:?\d{2}$|\]$/.test(input);
-var make4 = /* @__PURE__ */ liftThrowable(makeUnsafe2);
+var make5 = /* @__PURE__ */ liftThrowable(makeUnsafe2);
 var toUtc = (self) => makeUtc(self.epochMilliseconds);
 var toDateUtc = (self) => new Date(self.epochMilliseconds), toDate = (self) => {
   if (self._tag === "Utc")
@@ -12476,7 +12754,7 @@ var fnUntracedEager2 = fnUntracedEager;
 var isDateTime2 = isDateTime;
 var isUtc2 = isUtc;
 var makeUnsafe3 = makeUnsafe2;
-var make5 = make4;
+var make6 = make5;
 var toUtc2 = toUtc;
 var toEpochMillis2 = toEpochMillis;
 var formatIso2 = formatIso;
@@ -12553,16 +12831,16 @@ var missing = /* @__PURE__ */ Symbol();
 var succeed6 = succeed4, missingExit = /* @__PURE__ */ succeed6(missing), sameExit = /* @__PURE__ */ succeed6(missing), toOption = (value) => value === missing ? none2() : some2(value), fromOptionExit = (option) => option._tag === "None" ? missingExit : succeed6(option.value);
 
 // ../../node_modules/.bun/effect@4.0.1/node_modules/effect/dist/SchemaIssue.js
-var TypeId5 = "~effect/SchemaIssue/Issue";
+var TypeId6 = "~effect/SchemaIssue/Issue";
 function isIssue(u) {
-  return hasProperty(u, TypeId5) && u[TypeId5] === TypeId5;
+  return hasProperty(u, TypeId6) && u[TypeId6] === TypeId6;
 }
 function hasInput(issue) {
   return Object.hasOwn(issue, "input");
 }
 
 class IssueNodeImpl {
-  [TypeId5] = TypeId5;
+  [TypeId6] = TypeId6;
   constructor(input, options) {
     if (options?.reportInput === !0 && input !== missing)
       this.input = input;
@@ -12901,8 +13179,8 @@ function decodeBase64() {
 }
 
 // ../../node_modules/.bun/effect@4.0.1/node_modules/effect/dist/SchemaTransformation.js
-var TypeId6 = "~effect/SchemaTransformation/Transformation", Transformation = class extends Class {
-  [TypeId6] = TypeId6;
+var TypeId7 = "~effect/SchemaTransformation/Transformation", Transformation = class extends Class {
+  [TypeId7] = TypeId7;
   _tag = "Transformation";
   decode;
   encode;
@@ -12915,7 +13193,7 @@ var TypeId6 = "~effect/SchemaTransformation/Transformation", Transformation = cl
   }
 };
 function isTransformation(u) {
-  return hasProperty(u, TypeId6) && u[TypeId6] === TypeId6;
+  return hasProperty(u, TypeId7) && u[TypeId7] === TypeId7;
 }
 var makeTransformation = (options) => {
   if (isTransformation(options))
@@ -13011,10 +13289,10 @@ var isArrays = /* @__PURE__ */ makeGuard("Arrays"), isObjects = /* @__PURE__ */ 
   constructor(isOptional, isMutable, constructorDefault = void 0, annotations = void 0) {
     this.isOptional = isOptional, this.isMutable = isMutable, this.constructorDefault = constructorDefault, this.annotations = annotations;
   }
-}, TypeId7 = "~effect/Schema";
+}, TypeId8 = "~effect/Schema";
 
 class ASTNodeImpl {
-  [TypeId7] = TypeId7;
+  [TypeId8] = TypeId8;
   annotations;
   checks;
   encoding;
@@ -14603,7 +14881,7 @@ function compile2(ast, compile, compileField, base, specialize) {
 }
 
 // ../../node_modules/.bun/effect@4.0.1/node_modules/effect/dist/internal/schema/compilerRegistry.js
-var invalid = /* @__PURE__ */ Symbol(), cache = /* @__PURE__ */ new WeakMap, compiler, compilerAdaptersEnabled = !1;
+var invalid2 = /* @__PURE__ */ Symbol(), cache = /* @__PURE__ */ new WeakMap, compiler, compilerAdaptersEnabled = !1;
 var decodeChild = (ast) => compilerAdaptersEnabled ? lazyParser(resolve4, ast, "parser") : resolve4(ast).parser, makeChild = (ast) => compilerAdaptersEnabled ? lazyParser(resolve4, ast, "makeEffect") : resolve4(ast).makeEffect, makeField = (ast) => compileField(ast, makeChild);
 
 class InterpretedEntry {
@@ -14668,7 +14946,7 @@ function withDecode(fastDecode, decodeEffect) {
     if (input !== missing)
       try {
         let value = fastDecode(input, options);
-        if (value !== invalid)
+        if (value !== invalid2)
           return value === input ? sameExit : succeed6(value);
       } catch (error) {
         return die3(error);
@@ -14710,7 +14988,7 @@ function makeOption(schema) {
     return getSchemaIssueOrThrow(exit.cause, "Option adapter can only return none for schema issues"), none2();
   };
 }
-function make6(schema) {
+function make7(schema) {
   return makeConstructorSync(toType(schema.ast));
 }
 function is(schema) {
@@ -14813,7 +15091,7 @@ function makeConstructorSync(ast) {
       } catch (error) {
         throw getSchemaIssueOrThrow(die2(error), "Constructor adapter can only throw schema issues"), error;
       }
-      if (output !== invalid && output !== missing)
+      if (output !== invalid2 && output !== missing)
         return output;
     }
     let result = (parser ??= entry.makeEffect)(input, parseOptions);
@@ -14823,10 +15101,10 @@ function makeConstructorSync(ast) {
 var normalCompiler = (ast) => resolve4(ast).parser, constructorCompiler = (ast) => resolve4(ast).makeEffect;
 
 // ../../node_modules/.bun/effect@4.0.1/node_modules/effect/dist/internal/schema/make.js
-var TypeId8 = "~effect/Schema/Schema", RebuildOptions = /* @__PURE__ */ Symbol(), SchemaProto = {
-  [TypeId8]: TypeId8,
+var TypeId9 = "~effect/Schema/Schema", RebuildOptions = /* @__PURE__ */ Symbol(), SchemaProto = {
+  [TypeId9]: TypeId9,
   get make() {
-    let value = make6(this);
+    let value = make7(this);
     return Object.defineProperty(this, "make", {
       value,
       enumerable: !0
@@ -14859,10 +15137,10 @@ var TypeId8 = "~effect/Schema/Schema", RebuildOptions = /* @__PURE__ */ Symbol()
     return this.rebuild(appendChecks(this.ast, checks));
   },
   rebuild(ast) {
-    return make7(ast, this[RebuildOptions]);
+    return make8(ast, this[RebuildOptions]);
   }
 };
-function make7(ast, options) {
+function make8(ast, options) {
   function Schema() {}
   let self = Object.setPrototypeOf(Schema, SchemaProto);
   if (options && (Object.hasOwn(options, "name") || Object.hasOwn(options, "length") || Object.hasOwn(options, "__proto__")))
@@ -15063,9 +15341,9 @@ function isSchemaError(u) {
 }
 
 // ../../node_modules/.bun/effect@4.0.1/node_modules/effect/dist/Schema.js
-var TypeId9 = TypeId8;
+var TypeId10 = TypeId9;
 function declareConstructor() {
-  return (typeParameters, run, annotations) => make8(new Declaration(typeParameters.map(getAST), (typeParameters) => run(typeParameters.map((ast) => make8(ast))), annotations));
+  return (typeParameters, run, annotations) => make9(new Declaration(typeParameters.map(getAST), (typeParameters) => run(typeParameters.map((ast) => make9(ast))), annotations));
 }
 function declare(is, annotations) {
   return declareConstructor()([], () => (input, ast, options) => is(input) ? succeed5(input) : fail5(new InvalidType(ast, input, options)), annotations);
@@ -15137,26 +15415,26 @@ function encodeUnknownSync(schema, options) {
   let parser = encodeUnknownEffect2(schema, options);
   return (input, options) => runSchemaErrorSync(parser(input, options));
 }
-var encodeSync = encodeUnknownSync, make8 = make7;
+var encodeSync = encodeUnknownSync, make9 = make8;
 function isSchema(u) {
-  return hasProperty(u, TypeId9) && u[TypeId9] === TypeId9;
+  return hasProperty(u, TypeId10) && u[TypeId10] === TypeId10;
 }
-var optionalKey2 = /* @__PURE__ */ lambda((schema) => make8(optionalKey(schema.ast), {
+var optionalKey2 = /* @__PURE__ */ lambda((schema) => make9(optionalKey(schema.ast), {
   schema
 }));
 var optional4 = /* @__PURE__ */ lambda((self) => {
   let schema = UndefinedOr(self);
-  return make8(optional3(self.ast), {
+  return make9(optional3(self.ast), {
     schema
   });
 });
-var toType2 = /* @__PURE__ */ lambda((schema) => make8(toType(schema.ast), {
+var toType2 = /* @__PURE__ */ lambda((schema) => make9(toType(schema.ast), {
   schema
-})), toEncoded2 = /* @__PURE__ */ lambda((schema) => make8(toEncoded(schema.ast), {
+})), toEncoded2 = /* @__PURE__ */ lambda((schema) => make9(toEncoded(schema.ast), {
   schema
 }));
 function Literal2(literal) {
-  let out = make8(new Literal(literal), {
+  let out = make9(new Literal(literal), {
     literal,
     transform(to) {
       return out.pipe(decodeTo2(Literal2(to), {
@@ -15167,10 +15445,10 @@ function Literal2(literal) {
   });
   return out;
 }
-var Any2 = /* @__PURE__ */ make8(any), Unknown2 = /* @__PURE__ */ make8(unknown3), Null2 = /* @__PURE__ */ make8(null_), Undefined2 = /* @__PURE__ */ make8(undefined_2), String5 = /* @__PURE__ */ make8(string6);
-var Number5 = /* @__PURE__ */ make8(number6), Boolean3 = /* @__PURE__ */ make8(boolean5);
+var Any2 = /* @__PURE__ */ make9(any), Unknown2 = /* @__PURE__ */ make9(unknown3), Null2 = /* @__PURE__ */ make9(null_), Undefined2 = /* @__PURE__ */ make9(undefined_2), String5 = /* @__PURE__ */ make9(string6);
+var Number5 = /* @__PURE__ */ make9(number6), Boolean3 = /* @__PURE__ */ make9(boolean5);
 function makeStruct(ast, fields) {
-  return make8(ast, {
+  return make9(ast, {
     fields,
     mapFields(f, options) {
       let fields = f(this.fields);
@@ -15182,19 +15460,19 @@ function Struct(fields) {
   return makeStruct(struct(fields, void 0), fields);
 }
 function Record(key, value) {
-  return make8(record3(key.ast, value.ast), {
+  return make9(record3(key.ast, value.ast), {
     key,
     value
   });
 }
 function StructWithRest(schema, records) {
-  return make8(structWithRest(schema.ast, records.map(getAST)), {
+  return make9(structWithRest(schema.ast, records.map(getAST)), {
     schema,
     records
   });
 }
 function makeTuple(ast, elements) {
-  return make8(ast, {
+  return make9(ast, {
     elements,
     mapElements(f, options) {
       let elements = f(this.elements);
@@ -15205,14 +15483,14 @@ function makeTuple(ast, elements) {
 function Tuple(elements) {
   return makeTuple(tuple(elements), elements);
 }
-var ArraySchema = /* @__PURE__ */ lambda((schema) => make8(new Arrays(!1, [], [schema.ast]), {
+var ArraySchema = /* @__PURE__ */ lambda((schema) => make9(new Arrays(!1, [], [schema.ast]), {
   value: schema
 }));
-var NonEmptyArray = /* @__PURE__ */ lambda((schema) => make8(new Arrays(!1, [schema.ast], [schema.ast]), {
+var NonEmptyArray = /* @__PURE__ */ lambda((schema) => make9(new Arrays(!1, [schema.ast], [schema.ast]), {
   value: schema
 }));
 function makeUnion(ast, members) {
-  return make8(ast, {
+  return make9(ast, {
     members,
     mapMembers(f, options) {
       let members = f(this.members);
@@ -15225,7 +15503,7 @@ function Union2(members, options) {
 }
 function Literals(literals) {
   let members = literals.map(Literal2);
-  return make8(union3(members, void 0, void 0), {
+  return make9(union3(members, void 0, void 0), {
     literals,
     members,
     mapMembers(f) {
@@ -15241,19 +15519,19 @@ function Literals(literals) {
 }
 var NullOr = /* @__PURE__ */ lambda((self) => Union2([self, Null2])), UndefinedOr = /* @__PURE__ */ lambda((self) => Union2([self, Undefined2]));
 function suspend3(f) {
-  return make8(new Suspend(() => f().ast));
+  return make9(new Suspend(() => f().ast));
 }
 function check(...checks) {
   return (self) => self.check(...checks);
 }
 function brand(identifier) {
-  return (schema) => make8(schema.ast, {
+  return (schema) => make9(schema.ast, {
     schema,
     identifier
   });
 }
 function decodeTo2(to, transformation) {
-  return (from) => make8(decodeTo(from.ast, to.ast, transformation ? makeTransformation(transformation) : passthrough2()), {
+  return (from) => make9(decodeTo(from.ast, to.ast, transformation ? makeTransformation(transformation) : passthrough2()), {
     from,
     to
   });
@@ -15268,7 +15546,7 @@ function encodeTo(to, transformation) {
   return (from) => transformation ? decodeTo2(from, transformation)(to) : decodeTo2(from)(to);
 }
 function withConstructorDefault2(defaultValue) {
-  return (schema) => make8(withConstructorDefault(schema.ast, defaultValue), {
+  return (schema) => make9(withConstructorDefault(schema.ast, defaultValue), {
     schema
   });
 }
@@ -15424,7 +15702,7 @@ function isStartingWith(startsWith, annotations) {
     ...annotations
   });
 }
-var Finite = /* @__PURE__ */ make8(finite);
+var Finite = /* @__PURE__ */ make9(finite);
 function makeIsGreaterThan(options) {
   let gt = isGreaterThan(options.order), formatter = options.formatter ?? format;
   return (exclusiveMinimum, annotations) => makeFilter2((input) => gt(input, exclusiveMinimum), {
@@ -15810,7 +16088,7 @@ var Base64String = /* @__PURE__ */ String5.annotate({
   toCodecJson: () => link()(Base64String, uint8ArrayFromBase64String)
 });
 var dateTimeUtcFromString = /* @__PURE__ */ transformEffect2({
-  decode: (s, options) => match(make5(s), {
+  decode: (s, options) => match(make6(s), {
     onNone: () => fail5(new InvalidValue({
       expected: "a valid UTC DateTime string"
     }, s, options)),
@@ -15863,7 +16141,7 @@ function makeClass(Inherited, identifier, struct2, annotations, proto) {
         }
       });
     }
-    static [TypeId9] = TypeId9;
+    static [TypeId10] = TypeId10;
     get [ClassTypeId]() {
       return ClassTypeId;
     }
@@ -15880,7 +16158,7 @@ function makeClass(Inherited, identifier, struct2, annotations, proto) {
       return getClassSchema(this).rebuild(ast);
     }
     static make(input, options) {
-      return make6(getClassSchema(this))(input ?? {}, options);
+      return make7(getClassSchema(this))(input ?? {}, options);
     }
     static makeOption(input, options) {
       return makeOption(getClassSchema(this))(input ?? {}, options);
@@ -15932,7 +16210,7 @@ function getClassSchemaFactory(from, identifier, annotations) {
   return (self) => {
     if (memo !== void 0)
       return memo;
-    let ClassTypeId = getClassTypeId(identifier), isClassValue = (input) => input instanceof self || hasProperty(input, ClassTypeId), transformation = getClassTransformation(self), to = make8(new Declaration([from.ast], () => (input, ast, options) => isClassValue(input) ? succeed5(input) : fail5(new InvalidType(ast, input, options)), {
+    let ClassTypeId = getClassTypeId(identifier), isClassValue = (input) => input instanceof self || hasProperty(input, ClassTypeId), transformation = getClassTransformation(self), to = make9(new Declaration([from.ast], () => (input, ast, options) => isClassValue(input) ? succeed5(input) : fail5(new InvalidType(ast, input, options)), {
       identifier,
       [CONSTRUCTOR_ANNOTATION_KEY]: ([from]) => ({
         isConstructed: isClassValue,
@@ -15977,7 +16255,7 @@ var Error3 = (identifier) => (schema, annotations) => {
 function toEquivalence2(schema) {
   return toEquivalence(schema.ast);
 }
-var Json2 = /* @__PURE__ */ make8(/* @__PURE__ */ annotate(Json, {
+var Json2 = /* @__PURE__ */ make9(/* @__PURE__ */ annotate(Json, {
   toCode: () => ({
     runtime: "Schema.Json",
     Type: "Schema.Json"
@@ -16661,6 +16939,121 @@ var IDSchema2 = String5.check(isStartingWith("pty")).pipe(brand("PtyID"), annota
     cols: PositiveInt
   }))
 });
+// ../../node_modules/.bun/effect@4.0.1/node_modules/effect/dist/encoding/Sse.js
+var SseErrorTypeId = "~effect/encoding/Sse/SseError";
+
+class EventTooLarge extends (/* @__PURE__ */ TaggedError2("EventTooLarge")) {
+  get message() {
+    return `Pending SSE event exceeded the maximum size of ${this.maxEventSize}`;
+  }
+}
+
+class SseError extends (/* @__PURE__ */ TaggedError2("SseError")) {
+  [SseErrorTypeId] = SseErrorTypeId;
+  get message() {
+    return this.reason.message;
+  }
+}
+var defaultMaxEventSize = 10485760;
+function makeParser(onParse, options) {
+  let maxEventSize = options?.maxEventSize ?? defaultMaxEventSize, isFirstChunk, buffer, startingPosition, startingFieldLength, discardTrailingNewline, lastEventId, eventName, data;
+  return reset(), {
+    feed,
+    reset
+  };
+  function reset() {
+    isFirstChunk = !0, buffer = "", startingPosition = 0, startingFieldLength = -1, discardTrailingNewline = !1, lastEventId = void 0, eventName = void 0, data = "";
+  }
+  function feed(chunk) {
+    if (buffer = buffer ? buffer + chunk : chunk, isFirstChunk && buffer.startsWith(BOM))
+      buffer = buffer.slice(BOM.length);
+    isFirstChunk = !1;
+    let length = buffer.length, position = 0;
+    while (position < length) {
+      if (discardTrailingNewline) {
+        if (buffer[position] === `
+`)
+          ++position;
+        discardTrailingNewline = !1;
+      }
+      let lineLength = -1, fieldLength = startingFieldLength, character;
+      for (let index = position + startingPosition;lineLength < 0 && index < length; ++index)
+        if (character = buffer[index], character === ":" && fieldLength < 0)
+          fieldLength = index - position;
+        else if (character === "\r")
+          discardTrailingNewline = !0, lineLength = index - position;
+        else if (character === `
+`)
+          lineLength = index - position;
+      if (lineLength < 0) {
+        startingPosition = length - position, startingFieldLength = fieldLength;
+        break;
+      } else
+        startingPosition = 0, startingFieldLength = -1;
+      parseEventStreamLine(buffer, position, fieldLength, lineLength), position += lineLength + 1;
+    }
+    if (position === length)
+      buffer = "";
+    else if (position > 0)
+      buffer = buffer.slice(position);
+    if (buffer.length + data.length > maxEventSize) {
+      let error = new SseError({
+        reason: new EventTooLarge({
+          maxEventSize
+        })
+      });
+      return reset(), error;
+    }
+  }
+  function parseEventStreamLine(lineBuffer, index, fieldLength, lineLength) {
+    if (lineLength === 0) {
+      if (data.length > 0)
+        onParse({
+          _tag: "Event",
+          id: lastEventId,
+          event: eventName || "message",
+          data: data.slice(0, -1)
+        }), data = "";
+      eventName = void 0;
+      return;
+    }
+    let noValue = fieldLength < 0, field = lineBuffer.slice(index, index + (noValue ? lineLength : fieldLength)), step = 0;
+    if (noValue)
+      step = lineLength;
+    else if (lineBuffer[index + fieldLength + 1] === " ")
+      step = fieldLength + 2;
+    else
+      step = fieldLength + 1;
+    let position = index + step, valueLength = lineLength - step, value = lineBuffer.slice(position, position + valueLength).toString();
+    if (field === "data")
+      data += value ? `${value}
+` : `
+`;
+    else if (field === "event")
+      eventName = value;
+    else if (field === "id" && !value.includes("\x00"))
+      lastEventId = value;
+    else if (field === "retry" && /^\d+$/.test(value)) {
+      let retry = parseInt(value, 10);
+      onParse(new Retry({
+        duration: millis(retry),
+        lastEventId
+      }));
+    }
+  }
+}
+var BOM = "\uFEFF";
+var RetryTypeId = "~effect/encoding/Sse/Retry";
+
+class Retry extends (/* @__PURE__ */ TaggedClass("Retry")) {
+  [RetryTypeId] = RetryTypeId;
+  static is(u) {
+    return hasProperty(u, RetryTypeId);
+  }
+  static filter(u) {
+    return Retry.is(u) ? succeed2(u) : fail2(u);
+  }
+}
 // ../../node_modules/.bun/@opencode+schema@2.1.4/node_modules/@opencode/schema/dist/project.js
 var ID10 = ProjectID, Vcs = String5.check(isPattern2(/^[a-z][a-z0-9._-]*$/u)).annotate({
   identifier: "Project.Vcs"
@@ -17683,7 +18076,7 @@ var ForkBoundary = Boundary, Info18 = Struct({
   identifier: "SessionsCursor",
   description: "Opaque pagination cursor returned as cursor.previous or cursor.next in the previous response."
 }), statics((schema) => {
-  let make = make6(schema);
+  let make = make7(schema);
   return {
     make: (input) => make(encode4(encodeListCursor(input))),
     parse: (input) => suspend2(() => {
@@ -17795,7 +18188,7 @@ var ID16 = String5.pipe(brand("WebSearch.ID"), annotate2({ identifier: "WebSearc
   })
 }).annotate({ identifier: "WebSearch.Result" });
 
-class Response extends Class3("WebSearch.Response")({
+class Response2 extends Class3("WebSearch.Response")({
   providerID: ID16,
   results: ArraySchema(Result)
 }) {
@@ -18016,7 +18409,7 @@ $${account.available.toFixed(2)} left`), null;
   });
   for (let kind of ["context", "compaction", "generate", "title"])
     await ctx.session.hook(kind, async (event) => {
-      let history = await ctx.session.context({ sessionID: event.sessionID }), notices = new Set(history.filter((message) => message.metadata?.forgeBillingNotice === !0).map((message) => message.id));
+      let history = await ctx.session.context({ sessionID: event.sessionID }), notices = new Set(history.filter((message) => message.metadata?.forgeBillingNotice === !0 || message.metadata?.forgeResponseNotice === !0).map((message) => message.id));
       event.messages = event.messages.filter((message) => message.id === void 0 || !notices.has(message.id));
     });
   for (let providerID of ["forge", "forge-router"])
@@ -18079,6 +18472,298 @@ var EFFORTS2 = ["minimal", "low", "medium", "high", "xhigh", "max"], modelDefini
     tool_call: model.tool_call
   };
 }, forgeModels = (catalog, providerID) => Object.values(catalog).map((model) => buildModel(providerID, modelDefinition(model)));
+
+// ../models/src/response.ts
+var ModelSchema2 = string4().min(1).max(256).regex(/^[\w./:~-]+$/u), ChunkSchema = object2({
+  choices: array2(object2({ finish_reason: string4().nullish() })).optional().catch(void 0),
+  error: record(string4(), unknown2()).optional().catch(void 0),
+  finish_reason: string4().nullish().catch(void 0),
+  model: ModelSchema2.optional().catch(void 0),
+  usage: object2({ cost: number4().nonnegative().optional() }).optional().catch(void 0)
+}), TerminalReasons = /* @__PURE__ */ new Set([
+  "stop",
+  "tool_calls",
+  "function_call",
+  "length",
+  "content_filter",
+  "error"
+]);
+function responseObservation(headers) {
+  let routed = ModelSchema2.safeParse(headers?.get("x-forge-model"));
+  return {
+    clamped: headers?.get("x-forge-model-clamped") === "1",
+    routedModel: routed.success ? routed.data : void 0
+  };
+}
+function observeResponseData(observation, data) {
+  try {
+    let parsed = ChunkSchema.safeParse(JSON.parse(data));
+    if (parsed.success)
+      return observation.model = parsed.data.model ?? observation.model, observation.cost = parsed.data.usage?.cost ?? observation.cost, parsed.data.error !== void 0 || parsed.data.finish_reason !== void 0 && parsed.data.finish_reason !== null && TerminalReasons.has(parsed.data.finish_reason) || (parsed.data.choices?.some((choice) => choice.finish_reason !== void 0 && choice.finish_reason !== null && TerminalReasons.has(choice.finish_reason)) ?? !1);
+  } catch {}
+  return !1;
+}
+function switchNotice(requested, observation) {
+  if (observation.clamped && observation.routedModel !== void 0 && observation.routedModel !== requested) {
+    if (observation.model === void 0)
+      return `Forge routed ${requested} to ${observation.routedModel}. The responding model is unknown.`;
+    if (observation.model !== observation.routedModel)
+      return `Forge routed ${requested} to ${observation.routedModel}. The response reported ${observation.model}.`;
+  }
+  if (observation.model !== void 0 && observation.model !== requested)
+    return `Forge used ${observation.model} instead of ${requested}.`;
+  return;
+}
+
+// src/ledger.ts
+var RecordSchema = object2({
+  cost: number4().nonnegative().nullable(),
+  kind: _enum2(["primary", "compaction", "title", "generate"]),
+  model: string4().nullable(),
+  notice: string4().nullable(),
+  provider: string4(),
+  requested: string4(),
+  status: _enum2(["pending", "complete", "incomplete"])
+}), prefix = (sessionID) => `responses/${sessionID}/`;
+function costMessage(records, failed, unreadable) {
+  let reported = 0, missing = 0, pending = 0, incomplete = 0, total = 0, switches = /* @__PURE__ */ new Set, models = /* @__PURE__ */ new Map;
+  for (let record of records) {
+    if (record.cost === null)
+      missing += 1;
+    else
+      reported += 1, total += record.cost;
+    if (record.status === "pending")
+      pending += 1;
+    if (record.status === "incomplete")
+      incomplete += 1;
+    if (record.notice !== null)
+      switches.add(record.notice);
+    if (record.model !== null) {
+      let label = `${record.provider}/${record.model} (${record.kind})`;
+      models.set(label, (models.get(label) ?? 0) + 1);
+    }
+  }
+  let amount = total > 0 && total < 0.000000000001 ? total.toExponential(4) : total.toLocaleString("en-US", { maximumFractionDigits: 12, minimumFractionDigits: 2 });
+  return [
+    reported ? `Forge reported cost: $${amount}` : "No reported costs recorded.",
+    `Responses with reported cost: ${reported}`,
+    `Responses without reported cost: ${missing}`,
+    ...pending ? [`Responses still pending: ${pending}`] : [],
+    ...incomplete ? [`Interrupted responses: ${incomplete}`] : [],
+    ...failed ? [`Recording failures: ${failed}`] : [],
+    ...unreadable ? [`Unreadable records: ${unreadable}`] : [],
+    ...failed || unreadable ? ["The recorded total is incomplete."] : [],
+    ...[...models].map(([model, count]) => `Reported model: ${model} ×${count}`),
+    ...switches,
+    "The total covers recorded responses only and may be incomplete.",
+    "OpenCode's built-in cost remains an estimate."
+  ].join(`
+`);
+}
+function createResponseLedger(storage) {
+  let failures = /* @__PURE__ */ new Map, mark = (sessionID, key, failed) => {
+    let entries = failures.get(sessionID) ?? /* @__PURE__ */ new Set;
+    if (failed)
+      entries.add(key);
+    else
+      entries.delete(key);
+    if (entries.size)
+      failures.set(sessionID, entries);
+    else
+      failures.delete(sessionID);
+  }, save = async (sessionID, key, record) => {
+    try {
+      await storage.set(key, record), mark(sessionID, key, !1);
+    } catch (error) {
+      mark(sessionID, key, !0), console.error("[forge] Could not record response usage:", error);
+    }
+  };
+  return {
+    async finish(ref, observation, complete) {
+      let notice = switchNotice(ref.record.requested, observation);
+      return await save(ref.sessionID, ref.key, {
+        ...ref.record,
+        cost: observation.cost ?? null,
+        model: observation.model ?? null,
+        notice: notice ?? null,
+        status: complete ? "complete" : "incomplete"
+      }), notice;
+    },
+    async report(sessionID) {
+      let records = [], unreadable = 0, after;
+      try {
+        do {
+          let page = await storage.scan({ after, prefix: prefix(sessionID) });
+          for (let entry of page.entries) {
+            let parsed = RecordSchema.safeParse(entry.value);
+            if (parsed.success)
+              records.push(parsed.data);
+            else
+              unreadable += 1;
+          }
+          after = page.next;
+        } while (after !== void 0);
+      } catch (error) {
+        return console.error("[forge] Could not read response usage:", error), "Forge cost records could not be read. The total is unavailable.";
+      }
+      return costMessage(records, failures.get(sessionID)?.size ?? 0, unreadable);
+    },
+    async start(sessionID, request) {
+      let key = `${prefix(sessionID)}${crypto.randomUUID()}`, record = {
+        ...request,
+        cost: null,
+        model: null,
+        notice: null,
+        status: "pending"
+      };
+      return await save(sessionID, key, record), { key, record, sessionID };
+    }
+  };
+}
+
+// src/responses.ts
+var MaxEventLength = 10485760;
+function responseReader(observation, contentType) {
+  let decoder = /* @__PURE__ */ new TextDecoder, isEventStream = contentType.toLowerCase().includes("text/event-stream"), buffer = "", sawDone = !1, terminal = !1, parseFailed = !1, parser = makeParser((event) => {
+    if (event._tag !== "Event")
+      return;
+    if (event.data === "[DONE]")
+      sawDone = !0;
+    else if (observeResponseData(observation, event.data))
+      terminal = !0;
+  }, { maxEventSize: MaxEventLength }), feed = (text) => {
+    if (parseFailed)
+      return;
+    if (parser.feed(text) !== void 0)
+      parseFailed = !0, parser.reset();
+  };
+  return {
+    get done() {
+      return sawDone;
+    },
+    finish() {
+      if (isEventStream)
+        feed(decoder.decode());
+      else if (buffer.length <= MaxEventLength)
+        observeResponseData(observation, buffer + decoder.decode());
+    },
+    isEventStream,
+    push(bytes) {
+      let text = decoder.decode(bytes, { stream: !0 });
+      if (isEventStream)
+        feed(text);
+      else if (buffer.length <= MaxEventLength)
+        buffer += text;
+    },
+    get terminal() {
+      return !parseFailed && terminal;
+    }
+  };
+}
+function watchResponse(response, observation, complete) {
+  if (!response.body)
+    return complete(!1), response;
+  let source = response.body.getReader(), parser = responseReader(observation, response.headers.get("content-type") ?? ""), finished = !1, cancelled = !1, finish = async (fullyRead) => {
+    if (finished)
+      return;
+    finished = !0, parser.finish();
+    let completeResponse = parser.isEventStream ? parser.done || fullyRead && !cancelled && parser.terminal : fullyRead && !cancelled;
+    await complete(completeResponse);
+  }, body = new ReadableStream({
+    async cancel(reason) {
+      cancelled = !0;
+      try {
+        await source.cancel(reason);
+      } finally {
+        await finish(!1);
+      }
+    },
+    async pull(controller) {
+      try {
+        let chunk = await source.read();
+        if (chunk.done) {
+          await finish(!0), controller.close();
+          return;
+        }
+        let bytes = _instanceof(Uint8Array).parse(chunk.value);
+        parser.push(bytes), controller.enqueue(bytes);
+      } catch (error) {
+        await finish(!1), controller.error(error);
+      }
+    }
+  });
+  return new Response(body, {
+    headers: response.headers,
+    status: response.status,
+    statusText: response.statusText
+  });
+}
+async function registerResponses(ctx, signal) {
+  let ledger = createResponseLedger(ctx.storage), updates = /* @__PURE__ */ new Map, workers = /* @__PURE__ */ new Map, stopped = () => signal?.aborted === !0, queueNotice = (sessionID, notice) => {
+    let pending = updates.get(sessionID) ?? /* @__PURE__ */ new Set;
+    if (pending.add(notice), updates.set(sessionID, pending), workers.has(sessionID))
+      return;
+    let worker = (async () => {
+      try {
+        while (!stopped() && updates.has(sessionID)) {
+          if (await ctx.session.wait({ sessionID }), stopped())
+            return;
+          let batch = updates.get(sessionID) ?? /* @__PURE__ */ new Set;
+          updates.delete(sessionID);
+          let text = [...batch].join(`
+`);
+          await ctx.session.synthetic({
+            description: text,
+            metadata: { forgeResponseNotice: !0 },
+            resume: !1,
+            sessionID,
+            text
+          });
+        }
+      } catch (error) {
+        updates.delete(sessionID), console.error("[forge] Could not record the model switch:", error);
+      } finally {
+        if (workers.delete(sessionID), stopped())
+          updates.delete(sessionID);
+      }
+    })();
+    workers.set(sessionID, worker);
+  };
+  await ctx.command.transform((editor) => {
+    editor.add({
+      description: "Show Forge's reported cost for this session",
+      execute: async ({ sessionID }) => {
+        await ctx.session.wait({ sessionID });
+        while (workers.has(sessionID))
+          await workers.get(sessionID);
+        let text = await ledger.report(sessionID);
+        await ctx.session.synthetic({
+          description: text,
+          metadata: { forgeResponseNotice: !0 },
+          resume: !1,
+          sessionID,
+          text
+        });
+      },
+      name: "forge:cost"
+    });
+  });
+  for (let providerID of ["forge", "forge-router"])
+    await ctx.session.hook("http.response", async (event) => {
+      if (!event.response.ok)
+        return;
+      let observation = responseObservation(event.response.headers), record = await ledger.start(event.sessionID, {
+        kind: event.kind,
+        provider: providerID,
+        requested: event.model.id
+      });
+      event.response = watchResponse(event.response, observation, async (finished) => {
+        let notice = await ledger.finish(record, observation, finished);
+        if (notice !== void 0)
+          queueNotice(event.sessionID, notice);
+      });
+    }, { providerID });
+}
 
 // src/router-models.ts
 var routerModels = (data, providerID) => data.flatMap((model) => {
@@ -18232,7 +18917,7 @@ var serverFile = path5.join(homedir4(), ".forge", "server.json"), ROUTER_ID = "f
       console.error(`[forge] Could not watch ${serverFile}: ${message(error)}`);
     }
     let controller = new AbortController;
-    if (await registerBilling(ctx), (async () => {
+    if (await registerBilling(ctx), await registerResponses(ctx, controller.signal), (async () => {
       for await (let event of ctx.event.subscribe({ signal: controller.signal }))
         if (event.type === "integration.updated" || event.type === "credential.updated" || event.type === "credential.switched")
           await refreshRouter().catch(reportRouterError);

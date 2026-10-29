@@ -15,6 +15,7 @@ import { Provider } from "@opencode/schema/provider";
 
 import { billingAccount, billingNotice, registerBilling, usageMessage } from "./src/billing.ts";
 import { forgeModels } from "./src/forge-models.ts";
+import { registerResponses } from "./src/responses.ts";
 import { routerModels } from "./src/router-models.ts";
 import { discoverRouterModels, routerKey } from "./src/router.ts";
 
@@ -253,6 +254,7 @@ export default Plugin.define({
     const controller = new AbortController();
 
     await registerBilling(ctx);
+    await registerResponses(ctx, controller.signal);
 
     const observeIntegrationChanges = async () => {
       for await (const event of ctx.event.subscribe({ signal: controller.signal })) {

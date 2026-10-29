@@ -2,7 +2,7 @@
 import { useForgeClient } from "@forge/code-client";
 import type { ForgeClient } from "@forge/code-client";
 import { streamSimple } from "@oh-my-pi/pi-ai";
-import type { Api, SimpleStreamOptions } from "@oh-my-pi/pi-ai";
+import type { Api } from "@oh-my-pi/pi-ai";
 import { AgentRegistry, Text } from "@oh-my-pi/pi-coding-agent";
 import type {
   ExtensionAPI,
@@ -11,11 +11,13 @@ import type {
 } from "@oh-my-pi/pi-coding-agent";
 import { z } from "zod";
 
+import { NoticeType, responseAttempts, settleNotices, watchModelResponse } from "./responses.ts";
+import { forgetContext, rememberContext, requestContext } from "./session-context.ts";
+
 const ChargeSchema = z.union([z.literal("personal"), z.templateLiteral(["project:", z.uuid()])]);
 const BillingSchema = z.object({ chargeTo: ChargeSchema });
 const BillingType = "forge-billing";
 const BillingApi = "forge-billing-completions";
-const Contexts = new Map<string, ExtensionContext>();
 const ModelApis = new Map<string, Api>();
 
 type BillingClient = Pick<ForgeClient, "projectBudget"> & {
@@ -91,30 +93,11 @@ export function billingModels<T extends Pick<ProviderModelConfig, "id" | "api">>
   });
 }
 
-function requestContext(options: SimpleStreamOptions | undefined) {
-  const sessionId = options?.sessionId;
-
-  const active = AgentRegistry.global()
-    .list()
-    .find((agent) => agent.session?.sessionId === sessionId);
-
-  const context = active?.session
-    ? Contexts.get(active.session.sessionManager.getSessionId())
-    : undefined;
-
-  const ctx = context ?? (sessionId === undefined ? undefined : Contexts.get(sessionId));
-
-  if (!ctx) {
-    throw new Error("Cannot resolve the Forge billing account for this request.");
-  }
-
-  return ctx;
-}
-
 export const BillingProvider = {
   api: BillingApi,
   streamSimple: ((model, context, options) => {
-    const ctx = requestContext(options);
+    const entry = requestContext(options);
+    const { ctx } = entry;
     const session = billingSession(ctx);
     const target = chargeTo(session);
     const title = (session.getSessionName() ?? "").slice(0, 200);
@@ -124,7 +107,9 @@ export const BillingProvider = {
       throw new Error(`Cannot resolve the Forge model API: ${model.id}`);
     }
 
-    return streamSimple({ ...model, api }, context, {
+    const attempts = responseAttempts();
+
+    const inner = streamSimple({ ...model, api }, context, {
       ...options,
       headers:
         model.provider === "forge"
@@ -138,6 +123,7 @@ export const BillingProvider = {
       loopGuard: { ...options?.loopGuard, enabled: false },
       maxInFlightRequests: {},
       onPayload: async (payload, originalModel, signal) => {
+        attempts.begin();
         const changed = await options?.onPayload?.(payload, originalModel, signal);
 
         if (model.provider !== "forge-router") {
@@ -149,7 +135,22 @@ export const BillingProvider = {
 
         return { ...body, forge_usage: { ...usage, chargeTo: target, sessionTitle: title } };
       },
+      onResponse: async (response, originalModel, signal) => {
+        attempts.headers(new Headers(response.headers));
+        await options?.onResponse?.(response, originalModel, signal);
+      },
+      onSseEvent: (event, originalModel) => {
+        attempts.observe(event.data);
+        options?.onSseEvent?.(event, originalModel);
+      },
     });
+
+    // Decisions use a separate endpoint, which does not apply the chat model clamp.
+    if (api !== "openai-completions") {
+      return inner;
+    }
+
+    return watchModelResponse(inner, entry, model, attempts);
   }) satisfies NonNullable<Parameters<ExtensionAPI["registerProvider"]>[1]["streamSimple"]>,
 };
 
@@ -173,29 +174,46 @@ export function registerBilling(
     BillingType,
     (message) => new Text(message.details?.text ?? "", 0, 0)
   );
+  pi.registerMessageRenderer<{ text: string }>(
+    NoticeType,
+    (message) => new Text(message.details?.text ?? "", 0, 0)
+  );
 
   pi.on("session_start", (_event, ctx) => {
-    Contexts.set(ctx.sessionManager.getSessionId(), ctx);
+    rememberContext(ctx, pi);
   });
   pi.on("session_switch", (_event, ctx) => {
-    Contexts.set(ctx.sessionManager.getSessionId(), ctx);
+    rememberContext(ctx, pi);
   });
   pi.on("before_agent_start", (_event, ctx) => {
-    Contexts.set(ctx.sessionManager.getSessionId(), ctx);
+    rememberContext(ctx, pi);
+  });
+  pi.on("agent_end", (event, ctx) => {
+    if (event.willContinue === true) {
+      return;
+    }
+
+    const sessionId = ctx.sessionManager.getSessionId();
+    const entry = rememberContext(ctx, pi);
+    ctx.setTimeout(() => {
+      void settleNotices(entry, sessionId);
+    }, 0);
   });
 
   pi.on("context", (event, ctx) => {
-    Contexts.set(ctx.sessionManager.getSessionId(), ctx);
+    rememberContext(ctx, pi);
 
     return {
       messages: event.messages.filter(
-        (message) => message.role !== "custom" || message.customType !== BillingType
+        (message) =>
+          message.role !== "custom" ||
+          (message.customType !== BillingType && message.customType !== NoticeType)
       ),
     };
   });
 
   pi.on("session_shutdown", (_event, ctx) => {
-    Contexts.delete(ctx.sessionManager.getSessionId());
+    forgetContext(ctx.sessionManager.getSessionId());
   });
 
   pi.registerCommand("forge:usage", {
