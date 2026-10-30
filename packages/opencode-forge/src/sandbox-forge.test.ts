@@ -217,6 +217,8 @@ process.exitCode = await child.exited;
       expect(
         sandboxInventory.commands.filter((item) => item.name === "forge:billing")
       ).toHaveLength(1);
+      expect(sandboxInventory.commands.map((item) => item.name)).toContain("forge:usage");
+      expect(sandboxInventory.commands.map((item) => item.name)).not.toContain("forge:cost");
       expect(sandboxInventory.models).toContainEqual({ id: "test", providerID: "forge" });
       expect(sandboxInventory.plugins.filter((item) => item.id === "forge")).toEqual([
         { id: "forge", state: { status: "active" } },
@@ -229,13 +231,20 @@ process.exitCode = await child.exited;
         billingCommands: projectInventory.commands.filter((item) => item.name === "forge:billing")
           .length,
         commandStatus: projectInventory.commandStatus,
+        costCommands: projectInventory.commands.filter((item) => item.name === "forge:cost").length,
         forgeModel: projectInventory.models.some(
           (item) => item.id === "test" && item.providerID === "forge"
         ),
         forgePlugins: projectInventory.plugins.filter(
           (item) => item.id === "forge" && item.state.status === "active"
         ).length,
-      }).toEqual({ billingCommands: 1, commandStatus: 204, forgeModel: true, forgePlugins: 1 });
+      }).toEqual({
+        billingCommands: 1,
+        commandStatus: 204,
+        costCommands: 0,
+        forgeModel: true,
+        forgePlugins: 1,
+      });
     } finally {
       await server.stdin.end();
       await server.exited;

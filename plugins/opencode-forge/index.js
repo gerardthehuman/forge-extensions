@@ -11780,123 +11780,13 @@ function switchNotice(requested, observation) {
 
 // src/responses.ts
 import { makeParser } from "effect/encoding/Sse";
-
-// src/ledger.ts
-var RecordSchema = object2({
-  cost: number4().nonnegative().nullable(),
-  kind: _enum2(["primary", "compaction", "title", "generate"]),
-  model: string4().nullable(),
-  notice: string4().nullable(),
-  provider: string4(),
-  requested: string4(),
-  status: _enum2(["pending", "complete", "incomplete"])
-}), prefix = (sessionID) => `responses/${sessionID}/`;
-function costMessage(records, failed, unreadable) {
-  let reported = 0, missing = 0, pending = 0, incomplete = 0, total = 0, switches = /* @__PURE__ */ new Set, models = /* @__PURE__ */ new Map;
-  for (let record of records) {
-    if (record.cost === null)
-      missing += 1;
-    else
-      reported += 1, total += record.cost;
-    if (record.status === "pending")
-      pending += 1;
-    if (record.status === "incomplete")
-      incomplete += 1;
-    if (record.notice !== null)
-      switches.add(record.notice);
-    if (record.model !== null) {
-      let label = `${record.provider}/${record.model} (${record.kind})`;
-      models.set(label, (models.get(label) ?? 0) + 1);
-    }
-  }
-  let amount = total > 0 && total < 0.000000000001 ? total.toExponential(4) : total.toLocaleString("en-US", { maximumFractionDigits: 12, minimumFractionDigits: 2 });
-  return [
-    reported ? `Forge reported cost: $${amount}` : "No reported costs recorded.",
-    `Responses with reported cost: ${reported}`,
-    `Responses without reported cost: ${missing}`,
-    ...pending ? [`Responses still pending: ${pending}`] : [],
-    ...incomplete ? [`Interrupted responses: ${incomplete}`] : [],
-    ...failed ? [`Recording failures: ${failed}`] : [],
-    ...unreadable ? [`Unreadable records: ${unreadable}`] : [],
-    ...failed || unreadable ? ["The recorded total is incomplete."] : [],
-    ...[...models].map(([model, count]) => `Reported model: ${model} ×${count}`),
-    ...switches,
-    "The total covers recorded responses only and may be incomplete.",
-    "OpenCode's built-in cost remains an estimate."
-  ].join(`
-`);
-}
-function createResponseLedger(storage) {
-  let failures = /* @__PURE__ */ new Map, mark = (sessionID, key, failed) => {
-    let entries = failures.get(sessionID) ?? /* @__PURE__ */ new Set;
-    if (failed)
-      entries.add(key);
-    else
-      entries.delete(key);
-    if (entries.size)
-      failures.set(sessionID, entries);
-    else
-      failures.delete(sessionID);
-  }, save = async (sessionID, key, record) => {
-    try {
-      await storage.set(key, record), mark(sessionID, key, !1);
-    } catch (error) {
-      mark(sessionID, key, !0), console.error("[forge] Could not record response usage:", error);
-    }
-  };
-  return {
-    async finish(ref, observation, complete) {
-      let notice = switchNotice(ref.record.requested, observation);
-      return await save(ref.sessionID, ref.key, {
-        ...ref.record,
-        cost: observation.cost ?? null,
-        model: observation.model ?? null,
-        notice: notice ?? null,
-        status: complete ? "complete" : "incomplete"
-      }), notice;
-    },
-    async report(sessionID) {
-      let records = [], unreadable = 0, after;
-      try {
-        do {
-          let page = await storage.scan({ after, prefix: prefix(sessionID) });
-          for (let entry of page.entries) {
-            let parsed = RecordSchema.safeParse(entry.value);
-            if (parsed.success)
-              records.push(parsed.data);
-            else
-              unreadable += 1;
-          }
-          after = page.next;
-        } while (after !== void 0);
-      } catch (error) {
-        return console.error("[forge] Could not read response usage:", error), "Forge cost records could not be read. The total is unavailable.";
-      }
-      return costMessage(records, failures.get(sessionID)?.size ?? 0, unreadable);
-    },
-    async start(sessionID, request) {
-      let key = `${prefix(sessionID)}${crypto.randomUUID()}`, record = {
-        ...request,
-        cost: null,
-        model: null,
-        notice: null,
-        status: "pending"
-      };
-      return await save(sessionID, key, record), { key, record, sessionID };
-    }
-  };
-}
-
-// src/responses.ts
 var MaxEventLength = 10485760;
 function responseReader(observation, contentType) {
-  let decoder = /* @__PURE__ */ new TextDecoder, isEventStream = contentType.toLowerCase().includes("text/event-stream"), buffer = "", sawDone = !1, terminal = !1, parseFailed = !1, parser = makeParser((event) => {
+  let decoder = /* @__PURE__ */ new TextDecoder, isEventStream = contentType.toLowerCase().includes("text/event-stream"), buffer = "", parseFailed = !1, parser = makeParser((event) => {
     if (event._tag !== "Event")
       return;
-    if (event.data === "[DONE]")
-      sawDone = !0;
-    else if (observeResponseData(observation, event.data))
-      terminal = !0;
+    if (event.data !== "[DONE]")
+      observeResponseData(observation, event.data);
   }, { maxEventSize: MaxEventLength }), feed = (text) => {
     if (parseFailed)
       return;
@@ -11904,57 +11794,47 @@ function responseReader(observation, contentType) {
       parseFailed = !0, parser.reset();
   };
   return {
-    get done() {
-      return sawDone;
-    },
     finish() {
       if (isEventStream)
         feed(decoder.decode());
       else if (buffer.length <= MaxEventLength)
         observeResponseData(observation, buffer + decoder.decode());
     },
-    isEventStream,
     push(bytes) {
       let text = decoder.decode(bytes, { stream: !0 });
       if (isEventStream)
         feed(text);
       else if (buffer.length <= MaxEventLength)
         buffer += text;
-    },
-    get terminal() {
-      return !parseFailed && terminal;
     }
   };
 }
 function watchResponse(response, observation, complete) {
   if (!response.body)
-    return complete(!1), response;
-  let source = response.body.getReader(), parser = responseReader(observation, response.headers.get("content-type") ?? ""), finished = !1, cancelled = !1, finish = async (fullyRead) => {
+    return complete(), response;
+  let source = response.body.getReader(), parser = responseReader(observation, response.headers.get("content-type") ?? ""), finished = !1, finish = () => {
     if (finished)
       return;
-    finished = !0, parser.finish();
-    let completeResponse = parser.isEventStream ? parser.done || fullyRead && !cancelled && parser.terminal : fullyRead && !cancelled;
-    await complete(completeResponse);
+    finished = !0, parser.finish(), complete();
   }, body = new ReadableStream({
     async cancel(reason) {
-      cancelled = !0;
       try {
         await source.cancel(reason);
       } finally {
-        await finish(!1);
+        finish();
       }
     },
     async pull(controller) {
       try {
         let chunk = await source.read();
         if (chunk.done) {
-          await finish(!0), controller.close();
+          finish(), controller.close();
           return;
         }
         let bytes = _instanceof(Uint8Array).parse(chunk.value);
         parser.push(bytes), controller.enqueue(bytes);
       } catch (error) {
-        await finish(!1), controller.error(error);
+        finish(), controller.error(error);
       }
     }
   });
@@ -11965,7 +11845,7 @@ function watchResponse(response, observation, complete) {
   });
 }
 async function registerResponses(ctx, signal) {
-  let ledger = createResponseLedger(ctx.storage), updates = /* @__PURE__ */ new Map, workers = /* @__PURE__ */ new Map, stopped = () => signal?.aborted === !0, queueNotice = (sessionID, notice) => {
+  let updates = /* @__PURE__ */ new Map, workers = /* @__PURE__ */ new Map, stopped = () => signal?.aborted === !0, queueNotice = (sessionID, notice) => {
     let pending = updates.get(sessionID) ?? /* @__PURE__ */ new Set;
     if (pending.add(notice), updates.set(sessionID, pending), workers.has(sessionID))
       return;
@@ -11995,38 +11875,15 @@ async function registerResponses(ctx, signal) {
     })();
     workers.set(sessionID, worker);
   };
-  await ctx.command.transform((editor) => {
-    editor.add({
-      description: "Show Forge's reported cost for this session",
-      execute: async ({ sessionID }) => {
-        await ctx.session.wait({ sessionID });
-        while (workers.has(sessionID))
-          await workers.get(sessionID);
-        let text = await ledger.report(sessionID);
-        await ctx.session.synthetic({
-          description: text,
-          metadata: { forgeResponseNotice: !0 },
-          resume: !1,
-          sessionID,
-          text
-        });
-      },
-      name: "forge:cost"
-    });
-  });
   for (let providerID of ["forge", "forge-router"])
-    await ctx.session.hook("http.response", async (event) => {
+    await ctx.session.hook("http.response", (event) => {
       if (!event.response.ok)
         return;
-      let observation = responseObservation(event.response.headers), record = await ledger.start(event.sessionID, {
-        kind: event.kind,
-        provider: providerID,
-        requested: event.model.id
-      });
-      event.response = watchResponse(event.response, observation, async (finished) => {
-        let notice = await ledger.finish(record, observation, finished);
+      let observation = responseObservation(event.response.headers), requested = event.model.id, { sessionID } = event;
+      event.response = watchResponse(event.response, observation, () => {
+        let notice = switchNotice(requested, observation);
         if (notice !== void 0)
-          queueNotice(event.sessionID, notice);
+          queueNotice(sessionID, notice);
       });
     }, { providerID });
 }
