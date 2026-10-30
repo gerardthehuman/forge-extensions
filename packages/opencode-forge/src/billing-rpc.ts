@@ -1,9 +1,13 @@
 import { Rpc } from "@opencode/schema/rpc";
 import { z } from "zod";
 
+export const BillingQuestionPrefix = "call_forge_billing_";
+export const BillingQuestion = "Which budget should pay for this session and its subagents?";
+export const ProjectChargePrefix = "project:";
+
 export const ChargeSchema = z.union([
   z.literal("personal"),
-  z.templateLiteral(["project:", z.uuid()]),
+  z.templateLiteral([ProjectChargePrefix, z.uuid()]),
 ]);
 
 const SessionInput = z.object({ sessionID: z.string() });

@@ -9,7 +9,7 @@ import {
   refreshDesktopCatalog,
 } from "@forge/models/catalogs";
 import type { DesktopCatalog } from "@forge/models/catalogs";
-import { Plugin, Integration } from "@opencode/plugin";
+import { Integration } from "@opencode/plugin";
 import type { Model } from "@opencode/plugin";
 import { Provider } from "@opencode/schema/provider";
 
@@ -18,6 +18,7 @@ import { forgeModels } from "./src/forge-models.ts";
 import { registerResponses } from "./src/responses.ts";
 import { routerModels } from "./src/router-models.ts";
 import { discoverRouterModels, routerKey } from "./src/router.ts";
+import { withServerRuntime } from "./src/server-runtime.ts";
 
 const serverFile = path.join(homedir(), ".forge", "server.json");
 const ROUTER_ID = "forge-router";
@@ -54,9 +55,9 @@ interface PluginState {
   routerModels: Model.Info[] | undefined;
 }
 
-export default Plugin.define({
+export const ForgePlugin: Parameters<typeof withServerRuntime>[0] = {
   id: "forge",
-  async setup(ctx) {
+  async setup(ctx, runtime) {
     const configuredUrl = process.env.FORGE_ROUTER_BASE_URL;
 
     const baseUrl = (
@@ -253,7 +254,7 @@ export default Plugin.define({
 
     const controller = new AbortController();
 
-    await registerBilling(ctx);
+    const stopBilling = await registerBilling(ctx, runtime);
     await registerResponses(ctx, controller.signal);
 
     const observeIntegrationChanges = async () => {
@@ -326,10 +327,13 @@ export default Plugin.define({
 
     refreshMcp().catch(reportForgeError);
 
-    return () => {
+    return async () => {
       controller.abort();
       clearTimeout(refreshTimer);
       watcher?.close();
+      await stopBilling();
     };
   },
-});
+};
+
+export default withServerRuntime(ForgePlugin);

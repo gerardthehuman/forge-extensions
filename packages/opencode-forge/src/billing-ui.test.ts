@@ -1,82 +1,24 @@
 import { expect, test } from "bun:test";
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { z } from "zod";
 
 import { BillingRpc } from "./billing-rpc.ts";
+import { startBillingServer } from "./billing-server.fixture.ts";
 
 test("billing forms reject free text and transcript notices stay out of model requests", async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), "forge-billing-"));
-  const plugin = path.join(directory, "plugin");
-  const config = path.join(directory, "config/opencode");
-  await Promise.all([mkdir(plugin), mkdir(config, { recursive: true })]);
-
-  const build = await Bun.build({
-    entrypoints: [path.join(import.meta.dir, "billing.fixture.ts")],
-    naming: "index.js",
-    outdir: plugin,
-    target: "bun",
-  });
-
-  expect(build.success).toBe(true);
-  await writeFile(path.join(config, "opencode.json"), JSON.stringify({ plugins: [plugin] }));
-
-  const proc = Bun.spawn(
-    [
-      path.resolve(import.meta.dir, "../../../node_modules/.bin/opencode"),
-      "serve",
-      "--stdio",
-      "--port",
-      "0",
-    ],
-    {
-      cwd: directory,
-      env: {
-        ...process.env,
-        OPENCODE_DISABLE_MODELS_FETCH: "1",
-        OPENCODE_PASSWORD: "billing-test",
-        XDG_CONFIG_HOME: path.join(directory, "config"),
-        XDG_DATA_HOME: path.join(directory, "data"),
-        XDG_STATE_HOME: path.join(directory, "state"),
-      },
-      stderr: "pipe",
-      stdin: "pipe",
-      stdout: "pipe",
-    }
-  );
-
-  const logs = new Response(proc.stderr).text();
-  const controller = new AbortController();
+  const server = await startBillingServer();
+  const { directory } = server;
 
   try {
-    const startup = proc.stdout.pipeThrough(new TextDecoderStream()).getReader();
-    const first = await startup.read();
-    const { url } = z.object({ url: z.url() }).parse(JSON.parse(first.value?.split("\n")[0] ?? ""));
-
-    const headers = {
-      authorization: `Basic ${Buffer.from("opencode:billing-test").toString("base64")}`,
-      "content-type": "application/json",
-    };
-
     const request = async (
       route: string,
       body?: z.infer<ReturnType<typeof z.json>>,
       method = body === undefined ? "GET" : "POST"
     ) => {
-      const options: RequestInit = {
-        headers,
-        method,
-        signal: AbortSignal.timeout(10_000),
-      };
-
-      if (body !== undefined) {
-        options.body = JSON.stringify(body);
-      }
-
-      const response = await fetch(`${url}${route}`, options);
+      const response = await server.request(route, body, method);
 
       if (!response.ok) {
         throw new Error(await response.text());
@@ -97,63 +39,25 @@ test("billing forms reject free text and transcript notices stay out of model re
     const before = await request(`/api/session/${session.id}/context`);
     const transcript = await before.json();
 
-    const stream = await fetch(`${url}/api/event`, {
-      headers,
-      signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]),
-    });
+    const stream = await server.events();
 
-    if (stream.body === null) {
-      throw new Error("The event stream has no body");
-    }
-
-    const reader = stream.body.getReader();
-    const decoder = new TextDecoder();
-
-    const event = (async () => {
-      let buffer = "";
-
-      while (true) {
-        // SSE chunks arrive sequentially, and a frame can span chunks.
-        // oxlint-disable-next-line no-await-in-loop
-        const chunk = await reader.read();
-
-        if (chunk.done) {
-          throw new Error("The event stream ended before the form appeared");
-        }
-
-        buffer += decoder.decode(z.instanceof(Uint8Array).parse(chunk.value), { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) {
-            continue;
-          }
-
-          const parsed = z
-            .object({
-              data: z.object({
-                form: z.object({
-                  fields: z.array(
-                    z.object({
-                      custom: z.boolean(),
-                      options: z.array(z.object({ description: z.string(), label: z.string() })),
-                    })
-                  ),
-                  id: z.string(),
-                }),
-              }),
-              location: z.object({ directory: z.string() }).optional(),
-              type: z.literal("form.created"),
-            })
-            .safeParse(JSON.parse(line.slice(6)));
-
-          if (parsed.success) {
-            return parsed.data;
-          }
-        }
-      }
-    })();
+    const event = stream.next(
+      z.object({
+        data: z.object({
+          form: z.object({
+            fields: z.array(
+              z.object({
+                custom: z.boolean(),
+                options: z.array(z.object({ description: z.string(), label: z.string() })),
+              })
+            ),
+            id: z.string(),
+          }),
+        }),
+        location: z.object({ directory: z.string() }).optional(),
+        type: z.literal("form.created"),
+      })
+    );
 
     const available = await request("/api/rpc/forge.billing/choices", {
       input: { sessionID: session.id },
@@ -188,6 +92,10 @@ test("billing forms reject free text and transcript notices stay out of model re
       options: [
         { description: "$12.34 available", label: "Personal Budget" },
         { description: "$42.00 available", label: "Test Project" },
+        {
+          description: "$21.10 available",
+          label: "Personal Budget (22222222-2222-4222-8222-222222222222)",
+        },
       ],
     });
     await assert.rejects(
@@ -265,10 +173,6 @@ test("billing forms reject free text and transcript notices stay out of model re
     expect(captured).toContain("Hello");
     expect(captured).not.toContain("Forge Billing");
   } finally {
-    controller.abort();
-    proc.kill();
-    await proc.exited;
-    await logs;
-    await rm(directory, { force: true, recursive: true });
+    await server.stop();
   }
 }, 15_000);

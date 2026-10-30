@@ -3,6 +3,8 @@ import path from "node:path";
 
 import { z } from "zod";
 
+import { OpenCodePluginExternals } from "./build-config.ts";
+
 const PackageMetadataSchema = z.object({
   description: z.string().optional(),
   license: z.string().optional(),
@@ -28,7 +30,7 @@ const manifest = manifestResult.data;
 const result = await Bun.build({
   entrypoints: entrypoints.map((entry) => path.join(root, entry)),
   env: "disable",
-  external: ["@opencode/plugin/tui"],
+  external: OpenCodePluginExternals,
   format: "esm",
   metafile: true,
   minify: { syntax: true },

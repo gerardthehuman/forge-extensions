@@ -5,6 +5,8 @@ import path from "node:path";
 
 import { z } from "zod";
 
+import { OpenCodePluginExternals } from "../build-config.ts";
+
 test("OpenCode records Forge response costs separately for both providers", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "forge-response-"));
   const plugin = path.join(directory, "plugin");
@@ -13,6 +15,7 @@ test("OpenCode records Forge response costs separately for both providers", asyn
 
   const build = await Bun.build({
     entrypoints: [path.join(import.meta.dir, "responses.fixture.ts")],
+    external: OpenCodePluginExternals,
     naming: "index.js",
     outdir: plugin,
     target: "bun",

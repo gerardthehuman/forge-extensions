@@ -143,7 +143,7 @@ const context = {
 
 let refresh: (() => Promise<void>) | undefined;
 let usage: (() => Promise<void>) | undefined;
-let cleanup: (() => void) | undefined;
+let cleanup: (() => Promise<void> | void) | undefined;
 let ms = 0;
 let mcpUrl: string | undefined;
 let mcpHeaders: Record<string, string> | undefined;
@@ -223,7 +223,7 @@ if (host === "omp") {
     await usageCommand.handler("", context);
   };
 } else {
-  const { default: plugin } = await import("../../opencode-forge/index.ts");
+  const { ForgePlugin: plugin } = await import("../../opencode-forge/index.ts");
 
   interface McpEditor {
     set: (name: string, config: { url: string; headers?: Record<string, string> }) => void;
@@ -351,9 +351,22 @@ if (host === "omp") {
   };
 
   const start = performance.now();
+
   // Exercise the real setup and transforms without starting a CLI session.
-  const result: unknown = await Reflect.apply(plugin.setup, undefined, [ctx]);
-  cleanup = z.function({ output: z.void() }).parse(result);
+  const result: unknown = await Reflect.apply(plugin.setup, undefined, [
+    ctx,
+    {
+      assertPermission: async () => {
+        await Promise.resolve();
+        throw new Error("Unexpected permission request in the cache fixture");
+      },
+      registerQuestionCommand: async () => {
+        await Promise.resolve();
+      },
+    },
+  ]);
+
+  cleanup = z.function({ output: z.promise(z.void()) }).parse(result);
   ms = performance.now() - start;
 }
 
@@ -424,6 +437,6 @@ try {
     })
   );
 } finally {
-  cleanup?.();
+  await cleanup?.();
   await rm(directory, { force: true, recursive: true });
 }

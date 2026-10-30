@@ -42,14 +42,18 @@ recording failures and unreadable records when they are known.
 
 ## Billing
 
-Run `/forge:billing` in the TUI to choose Personal Budget or an available project budget. Each
-choice shows its available balance. The picker accepts only the listed choices. Forge Desktop must
-be running and signed in.
+Run `/forge:billing` to choose Personal Budget or an available project budget. Each choice shows its
+available balance. The question tool offers free text, but the command accepts only a listed budget.
+Forge Desktop must be running and signed in.
 
 The choice applies to this session and its subagents for Forge Desktop and Forge Router requests.
 Billing changes and usage results appear as transcript notices and stay out of model context.
-Dismiss the picker to keep the current budget. The bundled TUI entrypoint loads automatically with
+Dismiss the picker to keep the current budget. The TUI command palette also offers **Forge: choose
+billing budget**, which opens the TUI picker. The bundled TUI entrypoint loads automatically with
 the server plugin.
+
+In T3 Code, Forge server commands can leave a thread running after the command finishes. Until T3
+fixes command completion, use OpenCode's TUI for these commands.
 
 ## Forge MCP
 

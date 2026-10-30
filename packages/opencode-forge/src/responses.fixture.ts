@@ -1,12 +1,13 @@
-import { Model, Plugin, Provider } from "@opencode/plugin";
+import { Model, Provider } from "@opencode/plugin";
 import { Money } from "@opencode/schema/money";
 
 import { registerBilling } from "./billing.ts";
 import { registerResponses } from "./responses.ts";
+import { withServerRuntime } from "./server-runtime.ts";
 
-export default Plugin.define({
+export default withServerRuntime({
   id: "forge-response-test",
-  async setup(ctx) {
+  async setup(ctx, runtime) {
     for (const provider of ["forge", "forge-router"]) {
       const providerID = Provider.ID.make(provider);
       // The fixture needs both provider registrations before the session starts.
@@ -40,10 +41,12 @@ export default Plugin.define({
       });
     }
 
-    await registerBilling(ctx);
+    const stopBilling = await registerBilling(ctx, runtime);
     await registerResponses(ctx);
     await ctx.session.hook("title", (event) => {
       event.result = "Test";
     });
+
+    return stopBilling;
   },
 });

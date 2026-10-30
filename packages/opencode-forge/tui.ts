@@ -1,11 +1,21 @@
 import { Plugin } from "@opencode/plugin/tui";
 import type { Context } from "@opencode/plugin/tui/context";
 import { Form } from "@opencode/schema/form";
-import type { z } from "zod";
+import { z } from "zod";
 
-import { BillingRpc, ChargeSchema } from "./src/billing-rpc.ts";
+import {
+  BillingQuestion,
+  BillingQuestionPrefix,
+  BillingRpc,
+  ChargeSchema,
+} from "./src/billing-rpc.ts";
 
 type BillingChoices = z.infer<typeof BillingRpc.methods.choices.output>;
+
+const BillingQuestionMetadataSchema = z.object({
+  kind: z.literal("question"),
+  tool: z.object({ id: z.string().startsWith(BillingQuestionPrefix) }),
+});
 
 const pickBudget = async (ctx: Context, choices: BillingChoices, signal: AbortSignal) => {
   signal.throwIfAborted();
@@ -48,7 +58,7 @@ const pickBudget = async (ctx: Context, choices: BillingChoices, signal: AbortSi
             value: choice.target,
           })),
           required: true,
-          title: "Which budget should pay for this session and its subagents?",
+          title: BillingQuestion,
           type: "string",
         },
       ],
@@ -79,6 +89,31 @@ export default Plugin.define({
   setup(ctx) {
     const controller = new AbortController();
     let pending = false;
+
+    const syncBillingForm = async (sessionID: string) => {
+      try {
+        ctx.data.session.form.invalidate(sessionID);
+        await ctx.data.session.form.sync(sessionID);
+      } catch (error) {
+        ctx.ui.toast.show({
+          message: error instanceof Error ? error.message : String(error),
+          title: "Forge billing",
+          variant: "error",
+        });
+      }
+    };
+
+    // A question invoked by a server command can arrive without a location.
+    const unsubscribeBillingForms = ctx.data.on("form.created", (event) => {
+      if (
+        event.location ||
+        !BillingQuestionMetadataSchema.safeParse(event.data.form.metadata).success
+      ) {
+        return;
+      }
+
+      void syncBillingForm(event.data.form.sessionID);
+    });
 
     ctx.keymap.layer(() => ({
       commands: [
@@ -123,7 +158,6 @@ export default Plugin.define({
               pending = false;
             }
           },
-          slash: { name: "forge:billing" },
           title: "Forge: choose billing budget",
         },
       ],
@@ -131,6 +165,7 @@ export default Plugin.define({
     }));
 
     return () => {
+      unsubscribeBillingForms();
       controller.abort();
     };
   },

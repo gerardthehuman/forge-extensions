@@ -2,9 +2,20 @@
 import { useForgeClient } from "@forge/code-client";
 import type { ForgeClient } from "@forge/code-client";
 import type { Context } from "@opencode/plugin/promise/plugin";
+import { Agent } from "@opencode/schema/agent";
+import { SessionMessage } from "@opencode/schema/session-message";
+import { Tool } from "@opencode/schema/tool";
 import { z } from "zod";
 
-import { BillingRpc, ChargeSchema } from "./billing-rpc.ts";
+import { createBillingApprovalBridge } from "./billing-permission.ts";
+import {
+  BillingQuestionPrefix,
+  BillingQuestion,
+  BillingRpc,
+  ChargeSchema,
+  ProjectChargePrefix,
+} from "./billing-rpc.ts";
+import type { ServerRuntime } from "./server-runtime.ts";
 
 const MetadataSchema = z.object({
   forge: z.object({ chargeTo: ChargeSchema.optional() }).optional(),
@@ -76,7 +87,7 @@ export async function switchBilling(
       try {
         await forge.projectBudget.sessionSwitch({
           from: previous,
-          projectId: previous.slice(8),
+          projectId: previous.slice(ProjectChargePrefix.length),
           sessionId: session.id,
           to: next,
         });
@@ -91,7 +102,7 @@ export async function switchBilling(
     return;
   }
 
-  const projectId = next.slice(8);
+  const projectId = next.slice(ProjectChargePrefix.length);
   await forge.projectBudget.sessionSwitch({
     from: previous,
     projectId,
@@ -144,6 +155,30 @@ type BillingClient = Pick<ForgeClient, "projectBudget"> & {
   usage: () => { value: Promise<{ budget: { dailyBudgetUsd: number; remainingUsd: number } }> };
 };
 
+type BillingChoices = z.infer<typeof BillingRpc.methods.choices.output>["choices"];
+
+function uniqueChoices(choices: BillingChoices) {
+  const labels = new Set<string>();
+
+  return choices.map((choice) => {
+    let { label } = choice;
+    let suffix = 0;
+
+    while (labels.has(label)) {
+      suffix += 1;
+
+      const account =
+        choice.target === "personal" ? "personal" : choice.target.slice(ProjectChargePrefix.length);
+
+      label = `${choice.label} (${account}${suffix > 1 ? `, ${suffix}` : ""})`;
+    }
+
+    labels.add(label);
+
+    return { ...choice, label };
+  });
+}
+
 export async function billingAccount(ctx: BillingContext, forge: BillingClient, sessionID: string) {
   const root = await rootSession(ctx, sessionID);
   const target = chargeTo(root);
@@ -158,7 +193,7 @@ export async function billingAccount(ctx: BillingContext, forge: BillingClient, 
     };
   }
 
-  const project = await forge.projectBudget.state(target.slice(8));
+  const project = await forge.projectBudget.state(target.slice(ProjectChargePrefix.length));
 
   return { available: project.remainingUsd, name: project.title, total: undefined };
 }
@@ -185,8 +220,13 @@ export async function billingNotice(
 
 export async function registerBilling(
   ctx: Context,
+  runtime: ServerRuntime,
   connect: () => Promise<BillingClient> = useForgeClient
 ) {
+  const controller = new AbortController();
+  const pending = new Set<string>();
+  const approvals = createBillingApprovalBridge(ctx, runtime.assertPermission, controller.signal);
+
   await ctx.rpc.register(BillingRpc, {
     choices: async ({ sessionID }) => {
       const root = await rootSession(ctx, sessionID);
@@ -202,7 +242,7 @@ export async function registerBilling(
         : [];
 
       return {
-        choices: [
+        choices: uniqueChoices([
           {
             description: `$${usage.budget.remainingUsd.toFixed(2)} available`,
             label: "Personal Budget",
@@ -214,9 +254,9 @@ export async function registerBilling(
               projects.filter((candidate) => candidate.title === project.title).length > 1
                 ? `${project.title} (${project.projectId})`
                 : project.title,
-            target: ChargeSchema.parse(`project:${project.projectId}`),
+            target: ChargeSchema.parse(`${ProjectChargePrefix}${project.projectId}`),
           })),
-        ],
+        ]),
         current: chargeTo(root),
         sessionID: root.id,
       };
@@ -234,7 +274,10 @@ export async function registerBilling(
 
       if (previous !== "personal") {
         try {
-          const project = await forge.projectBudget.state(previous.slice(8));
+          const project = await forge.projectBudget.state(
+            previous.slice(ProjectChargePrefix.length)
+          );
+
           previousName = project.title;
         } catch {
           // An unavailable previous project must not prevent switching away from it.
@@ -252,6 +295,116 @@ export async function registerBilling(
 
       return null;
     },
+  });
+
+  await runtime.registerQuestionCommand({
+    description: "Choose the Forge budget for this session",
+    execute: async ({ sessionID }, question) => {
+      const root = await rootSession(ctx, sessionID);
+
+      if (pending.has(root.id)) {
+        throw new Error("A Forge billing selection is already open for this session.");
+      }
+
+      pending.add(root.id);
+
+      try {
+        const billing = ctx.rpc(BillingRpc);
+        const choices = await billing.choices({ sessionID: root.id });
+        const options = choices.choices;
+        const current = options.find((option) => option.target === choices.current);
+        const askingSession = root.id === sessionID ? root : await ctx.session.get({ sessionID });
+        let { agent } = askingSession;
+
+        if (agent === undefined) {
+          const availableAgents = await ctx.agent.list();
+          agent =
+            availableAgents.data.find(
+              (candidate) => candidate.mode !== "subagent" && !candidate.hidden
+            )?.id ?? "build";
+        }
+
+        // The question tool requires tool IDs, but a server command has no corresponding message.
+        const callID = Tool.CallID.make(`${BillingQuestionPrefix}${crypto.randomUUID()}`);
+        const messageID = SessionMessage.ID.create();
+        const agentID = Agent.ID.make(agent);
+
+        const permission = await approvals.register({
+          agent: agentID,
+          callID,
+          messageID,
+          sessionID,
+        });
+
+        let result;
+
+        try {
+          result = await question(
+            {
+              questions: [
+                {
+                  header: "Forge billing",
+                  options: options.map(({ description, label }) => ({ description, label })),
+                  question: `${BillingQuestion}\nCurrent budget: ${current?.label ?? "Unavailable"}`,
+                },
+              ],
+            },
+            {
+              agent: agentID,
+              id: callID,
+              messageID,
+              // The question tool does not report progress.
+              // oxlint-disable-next-line typescript/promise-function-async
+              progress: () => Promise.resolve(),
+              sessionID,
+              signal: controller.signal,
+            }
+          );
+        } catch (error) {
+          if (
+            controller.signal.aborted ||
+            (error instanceof Error && error.message.includes("The user dismissed this question"))
+          ) {
+            return;
+          }
+
+          const approvalError = permission.rejection();
+
+          if (approvalError instanceof Error) {
+            throw approvalError;
+          }
+
+          if (approvalError !== undefined) {
+            throw new Error("Forge billing approval was rejected.", { cause: error });
+          }
+
+          throw error;
+        } finally {
+          await permission.dispose();
+        }
+
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        const answer = z.object({ answers: z.tuple([z.array(z.string())]) }).parse(result.output);
+        const [selected] = answer.answers;
+
+        const choice =
+          selected.length === 1
+            ? options.find((option) => option.label === selected[0])
+            : undefined;
+
+        if (choice === undefined) {
+          throw new Error("Choose one of the listed Forge budgets.");
+        }
+
+        await billing.switch({ sessionID: root.id, target: choice.target });
+      } finally {
+        pending.delete(root.id);
+      }
+    },
+    name: "forge:billing",
   });
 
   // Notices are durable UI annotations. Remove them from every model request,
@@ -295,4 +448,9 @@ export async function registerBilling(
       { providerID }
     );
   }
+
+  return async () => {
+    controller.abort();
+    await approvals.stop();
+  };
 }
