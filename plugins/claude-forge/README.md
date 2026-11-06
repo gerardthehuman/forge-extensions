@@ -1,6 +1,7 @@
 # Forge for Claude Code
 
 Adds Forge Desktop's MCP tools to Claude Code. This plugin has no models, commands, or hooks.
+Forge MCP prompts do not appear as slash commands.
 
 ## Installation
 

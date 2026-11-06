@@ -17,8 +17,12 @@ const ResultSchema = z.object({
   freshCredentials: z.boolean(),
   freshUrl: z.boolean(),
   headerPolicy: z.string(),
+  prompts: z.array(z.string()),
+  providers: z.string(),
+  skills: z.string(),
   tools: z.array(z.string()),
   unavailable: z.boolean(),
+  writes: z.string(),
 });
 
 test("discovers and connects native HTTP MCP with current credentials and extension scope", async () => {
@@ -55,8 +59,12 @@ test("discovers and connects native HTTP MCP with current credentials and extens
       freshCredentials: true,
       freshUrl: true,
       headerPolicy: "origin-locked",
+      prompts: [],
+      providers: "example",
+      skills: ",",
       tools: ["fixture_read"],
       unavailable: true,
+      writes: "1",
     });
   } finally {
     await rm(directory, { force: true, recursive: true });

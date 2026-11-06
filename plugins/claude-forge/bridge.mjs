@@ -29,6 +29,9 @@ const discover = async () => {
     throw new Error("Forge MCP must use a local endpoint.");
   }
 
+  // A non-empty CSV with no entries suppresses Forge MCP prompt commands.
+  url.searchParams.set("skills", ",");
+
   return { headers: forge.headers ?? {}, url: url.href };
 };
 

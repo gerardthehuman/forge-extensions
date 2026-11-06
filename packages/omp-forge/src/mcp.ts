@@ -50,6 +50,8 @@ export const registerForgeMcp = (pi: ExtensionAPI, entrypoint: string): void => 
       try {
         const forge = await useForgeClient();
         const { url, headers } = McpEndpointSchema.parse(await forge.mcp.servers());
+        // A non-empty CSV with no entries suppresses Forge MCP prompt commands.
+        url.searchParams.set("skills", ",");
 
         return {
           items: [

@@ -10,7 +10,12 @@ import {
   loadExtensionFromFactory,
 } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader";
 import { cfgDisabledExtensions } from "@oh-my-pi/pi-coding-agent/extensibility/settings";
-import { connectToServer, disconnectServer, listTools } from "@oh-my-pi/pi-coding-agent/mcp/client";
+import {
+  connectToServer,
+  disconnectServer,
+  listPrompts,
+  listTools,
+} from "@oh-my-pi/pi-coding-agent/mcp/client";
 import { loadAllMCPConfigs } from "@oh-my-pi/pi-coding-agent/mcp/config";
 import { EventBus } from "@oh-my-pi/pi-coding-agent/utils/event-bus";
 import { z } from "zod";
@@ -40,7 +45,7 @@ const server = Bun.serve({
         id: message.id,
         jsonrpc: "2.0",
         result: {
-          capabilities: { tools: {} },
+          capabilities: { prompts: {}, tools: {} },
           protocolVersion: "2025-03-26",
           serverInfo: { name: "forge-fixture", version: "1.0.0" },
         },
@@ -55,13 +60,23 @@ const server = Bun.serve({
       });
     }
 
+    if (message.method === "prompts/list") {
+      const skills = new URL(request.url).searchParams.get("skills");
+
+      return Response.json({
+        id: message.id,
+        jsonrpc: "2.0",
+        result: { prompts: skills === "," ? [] : [{ name: "fixture_prompt" }] },
+      });
+    }
+
     return new Response(null, { status: 202 });
   },
   hostname: "127.0.0.1",
   port: 0,
 });
 
-let url = new URL("/mcp", server.url).href;
+let url = new URL("/mcp?providers=example&writes=1&skills=old", server.url).href;
 let credential = "Bearer first-fixture-credential";
 let unavailable = false;
 let calls = 0;
@@ -120,16 +135,21 @@ try {
 
   const connection = await connectToServer("forge", config);
   let tools: string[];
+  let prompts: string[];
 
   try {
     const listed = await listTools(connection);
     tools = listed.map((tool) => tool.name);
+    const listedPrompts = await listPrompts(connection);
+    prompts = listedPrompts.map((prompt) => prompt.name);
   } finally {
     await disconnectServer(connection);
   }
 
   const callsAfterStartup = calls;
   url = new URL("/restarted", server.url).href;
+  const refreshedUrl = new URL(url);
+  refreshedUrl.searchParams.set("skills", ",");
   credential = "Bearer restarted-fixture-credential";
   const refreshed = await discover();
   const refreshedConfig = refreshed.configs.forge;
@@ -158,10 +178,14 @@ try {
       ),
       freshCredentials:
         refreshedConfig.type === "http" && refreshedConfig.headers?.Authorization === credential,
-      freshUrl: refreshedConfig.type === "http" && refreshedConfig.url === url,
+      freshUrl: refreshedConfig.type === "http" && refreshedConfig.url === refreshedUrl.href,
       headerPolicy: config.headerPolicy,
+      prompts,
+      providers: new URL(config.url).searchParams.get("providers"),
+      skills: new URL(config.url).searchParams.get("skills"),
       tools,
       unavailable: failed.items.every((item) => item.name !== "forge"),
+      writes: new URL(config.url).searchParams.get("writes"),
     })
   );
 } finally {

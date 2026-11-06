@@ -15156,7 +15156,7 @@ var registerForgeMcp = (pi, entrypoint) => {
         return { items: [] };
       try {
         let forge = await useForgeClient(), { url, headers } = McpEndpointSchema.parse(await forge.mcp.servers());
-        return {
+        return url.searchParams.set("skills", ","), {
           items: [
             {
               _source: { level: "user", path: source, provider: id, providerName: "Forge" },

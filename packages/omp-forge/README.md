@@ -2,6 +2,8 @@
 
 Use Forge Models, Forge MCP and Forge Router for OMP.
 
+Forge MCP tools are available, but Forge MCP prompts do not appear as slash commands.
+
 ## Installation
 
 If the marketplace is not registered, add it:
