@@ -61,7 +61,12 @@ for (const host of ["omp", "opencode"]) {
       expect(result.usageReports.join("\n")).not.toContain("Private");
 
       if (host === "omp") {
-        expect(result.commandNames).toEqual(["forge:usage", "forge:billing", "forge:refresh"]);
+        expect(result.commandNames).toEqual([
+          "forge:usage",
+          "forge:billing",
+          "forge:tools",
+          "forge:refresh",
+        ]);
       }
 
       if (host === "opencode") {

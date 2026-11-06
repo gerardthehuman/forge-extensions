@@ -4,10 +4,12 @@ import { registerBilling } from "./billing.ts";
 import forgeDesktopPlugin from "./desktop.ts";
 import { registerForgeMcp } from "./mcp.ts";
 import forgeRouterPlugin from "./router/index.ts";
+import { registerToolsCommand } from "./tools.ts";
 
 export default async function forgePlugin(pi: ExtensionAPI) {
   registerForgeMcp(pi, import.meta.url);
   registerBilling(pi);
+  registerToolsCommand(pi);
 
   const [refreshDesktop, refreshRouter] = await Promise.all([
     forgeDesktopPlugin(pi),

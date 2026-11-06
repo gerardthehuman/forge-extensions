@@ -1,4 +1,6 @@
 import { mock } from "bun:test";
+import { mkdir, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -147,17 +149,40 @@ try {
   }
 
   const callsAfterStartup = calls;
+  const lockfile = path.join(homedir(), ".omp", "plugins", "omp-plugins.lock.json");
+  await mkdir(path.dirname(lockfile), { recursive: true });
+  await writeFile(
+    lockfile,
+    JSON.stringify({ plugins: {}, settings: { "@forge/omp": { tools: ["slack", "jira"] } } })
+  );
+
   url = new URL("/restarted", server.url).href;
   const refreshedUrl = new URL(url);
+  refreshedUrl.searchParams.set("providers", "slack,jira");
   refreshedUrl.searchParams.set("skills", ",");
   credential = "Bearer restarted-fixture-credential";
   const refreshed = await discover();
   const refreshedConfig = refreshed.configs.forge;
+  await writeFile(
+    lockfile,
+    JSON.stringify({ plugins: {}, settings: { "@forge/omp": { tools: [] } } })
+  );
+  const empty = await discover();
+  const emptyConfig = empty.configs.forge;
   const excluded = await discover([]);
   const callsAfterExclusion = calls;
   cfgDisabledExtensions.override(settings, ["mcp:forge"]);
   const disabled = await discover();
   cfgDisabledExtensions.override(settings, []);
+  await writeFile(
+    lockfile,
+    JSON.stringify({ plugins: {}, settings: { "@forge/omp": { tools: ["skill_flow"] } } })
+  );
+
+  const invalidSelection = await loadCapability<MCPServer>("mcps", {
+    extensionRoots: { ...roots, explicit: [entrypoint] },
+  });
+
   unavailable = true;
 
   const failed = await loadCapability<MCPServer>("mcps", {
@@ -171,6 +196,9 @@ try {
       callsAfterStartup,
       clientName,
       disabled: disabled.configs.forge === undefined,
+      emptySelection:
+        emptyConfig.type === "http" &&
+        new URL(emptyConfig.url).searchParams.get("providers") === ",",
       excluded: excluded.configs.forge === undefined,
       failureHidden: !JSON.stringify(failed).includes("private-fixture-credential"),
       failureWarning: failed.warnings.some((warning) =>
@@ -180,6 +208,11 @@ try {
         refreshedConfig.type === "http" && refreshedConfig.headers?.Authorization === credential,
       freshUrl: refreshedConfig.type === "http" && refreshedConfig.url === refreshedUrl.href,
       headerPolicy: config.headerPolicy,
+      invalidSelection:
+        invalidSelection.items.every((item) => item.name !== "forge") &&
+        invalidSelection.warnings.some((warning) =>
+          warning.includes("provider selection is invalid")
+        ),
       prompts,
       providers: new URL(config.url).searchParams.get("providers"),
       skills: new URL(config.url).searchParams.get("skills"),

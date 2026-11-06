@@ -15138,6 +15138,22 @@ var ServersSchema = object2({
   return { headers: headers.data, url };
 });
 
+// src/tools-config.ts
+import { getPluginSettings } from "@oh-my-pi/pi-coding-agent/extensibility/plugins/loader";
+import { PluginManager } from "@oh-my-pi/pi-coding-agent/extensibility/plugins/manager";
+var PluginName = "@forge/omp", ProviderId = string4().min(1).refine((value) => value === value.trim() && !value.includes(",")), ToolsSchema = union2([literal(!0), array2(ProviderId)]), readToolsPreference = async (cwd) => {
+  let settings = await getPluginSettings(PluginName, cwd);
+  return ToolsSchema.parse(settings.tools === void 0 ? !0 : settings.tools);
+}, saveToolsPreference = async (cwd, value) => {
+  await new PluginManager(cwd).setPluginSetting(PluginName, "tools", ToolsSchema.parse(value));
+}, applyToolsPreference = (url, preference) => {
+  if (preference !== !0) {
+    if (preference.some((id) => id.includes("_")))
+      throw Error("Forge cannot scope a provider whose ID contains an underscore.");
+    url.searchParams.set("providers", preference.length === 0 ? "," : preference.join(","));
+  }
+};
+
 // src/mcp.ts
 var registerForgeMcp = (pi, entrypoint) => {
   let source = fileURLToPath(entrypoint), id = `forge-mcp:${source}`;
@@ -15156,7 +15172,7 @@ var registerForgeMcp = (pi, entrypoint) => {
         return { items: [] };
       try {
         let forge = await useForgeClient(), { url, headers } = McpEndpointSchema.parse(await forge.mcp.servers());
-        return url.searchParams.set("skills", ","), {
+        return applyToolsPreference(url, await readToolsPreference(ctx.cwd)), url.searchParams.set("skills", ","), {
           items: [
             {
               _source: { level: "user", path: source, provider: id, providerName: "Forge" },
@@ -15171,7 +15187,9 @@ var registerForgeMcp = (pi, entrypoint) => {
       } catch {
         return {
           items: [],
-          warnings: ["Forge MCP is unavailable. Start Forge Desktop, then restart OMP."]
+          warnings: [
+            "Forge MCP is unavailable or its provider selection is invalid. Check Forge Desktop and /forge:tools."
+          ]
         };
       }
     },
@@ -15379,9 +15397,187 @@ var PROVIDER = "forge-router", DEFAULT_BASE_URL = "https://forge.forgeworkspace.
   }), refreshModels;
 }, router_default = forgeRouterPlugin;
 
+// src/tools.ts
+import {
+  connectToServer,
+  disconnectServer,
+  listResources,
+  listTools
+} from "@oh-my-pi/pi-coding-agent/mcp/client";
+var providerLabel = (provider) => provider.name === provider.id ? provider.id : `${provider.name} (${provider.id})`, All = "All", Save = "Save", MaxCandidates = 100, ProbeBatchSize = 4;
+
+class ProviderCatalogError extends Error {
+  name = "ProviderCatalogError";
+}
+var connect = async (url, headers) => await connectToServer("forge-catalog", {
+  headerPolicy: "origin-locked",
+  headers,
+  type: "http",
+  url: url.href
+}), toolsFor = async (url, headers, providers) => {
+  if (providers.length === 0)
+    return [];
+  let scoped = new URL(url);
+  scoped.searchParams.set("providers", providers.join(","));
+  let connection = await connect(scoped, headers);
+  try {
+    return (await listTools(connection)).map((tool) => tool.name);
+  } finally {
+    await disconnectServer(connection);
+  }
+}, probeProviders = async (url, headers, candidates) => {
+  let matches = [];
+  for (let index = 0;index < candidates.length; index += ProbeBatchSize) {
+    let batch = await Promise.all(candidates.slice(index, index + ProbeBatchSize).map(async (id) => ({
+      id,
+      tools: await toolsFor(url, headers, [id])
+    })));
+    matches.push(...batch);
+  }
+  return matches;
+}, discoverToolProviders = async () => {
+  let forge = await useForgeClient(), { url, headers } = McpEndpointSchema.parse(await forge.mcp.servers());
+  url.searchParams.delete("providers"), url.searchParams.set("skills", ",");
+  let connection = await connect(url, headers), providers = /* @__PURE__ */ new Map, names;
+  try {
+    let [resources, tools] = await Promise.all([
+      listResources(connection),
+      listTools(connection)
+    ]);
+    names = tools.map((tool) => tool.name);
+    for (let resource of resources) {
+      let id = /^forge:\/\/context\/(?<id>[^/]+)\/(?:system|snapshot)$/u.exec(resource.uri)?.groups?.id;
+      if (id !== void 0 && !id.includes(","))
+        providers.set(id, resource.name.replace(/ — (?:connection|snapshot)$/u, ""));
+    }
+  } finally {
+    await disconnectServer(connection);
+  }
+  let covered = new Set(await toolsFor(url, headers, [...providers.keys()])), attempted = new Set(providers.keys()), record = (matches) => {
+    for (let match of matches)
+      if (match.tools.length > 0) {
+        providers.set(match.id, providers.get(match.id) ?? match.id);
+        for (let name of match.tools)
+          covered.add(name);
+      }
+  }, missing = names.filter((name) => !covered.has(name));
+  while (missing.length > 0) {
+    let candidates = /* @__PURE__ */ new Set;
+    for (let name of missing)
+      for (let index = name.indexOf("_");index >= 0; index = name.indexOf("_", index + 1)) {
+        let candidate = name.slice(0, index);
+        if (!attempted.has(candidate)) {
+          candidates.add(candidate);
+          break;
+        }
+      }
+    if (candidates.size === 0)
+      break;
+    if (attempted.size + candidates.size > MaxCandidates)
+      throw new ProviderCatalogError("Forge returned too many unidentified tool providers.");
+    for (let id of candidates)
+      attempted.add(id);
+    record(await probeProviders(url, headers, [...candidates])), missing = names.filter((name) => !covered.has(name));
+  }
+  if (missing.length > 0) {
+    let retry = [...attempted].filter((id) => missing.some((name) => name.startsWith(`${id}_`)));
+    record(await probeProviders(url, headers, retry)), missing = names.filter((name) => !covered.has(name));
+  }
+  if (missing.length > 0)
+    throw new ProviderCatalogError("Forge could not identify every tool provider. Please retry.");
+  return [...providers].map(([id, name]) => ({ id, name })).toSorted((a, b) => a.id.localeCompare(b.id));
+}, selectSupportedProviders = (ctx, items, selected) => {
+  selected.clear();
+  for (let item of items)
+    if (!item.id.includes("_"))
+      selected.add(item.id);
+  if (items.some((item) => item.id.includes("_")))
+    ctx.ui.notify("Forge providers marked All only cannot be used in a custom selection.", "warning");
+}, initialSelection = (ctx, available, preference) => {
+  let providers = new Map(available.map((provider) => [provider.id, provider]));
+  if (preference !== !0) {
+    for (let id of preference)
+      if (!providers.has(id))
+        providers.set(id, { id, name: `${id} (not currently available)` });
+  }
+  let items = [...providers.values()].toSorted((a, b) => a.id.localeCompare(b.id)), selected = new Set(preference === !0 ? items.map((item) => item.id) : preference.filter((id) => !id.includes("_")));
+  if (preference !== !0 && preference.some((id) => id.includes("_")))
+    ctx.ui.notify("Providers marked All only will be removed if you save a custom selection.", "warning");
+  return { all: preference === !0, items, selected };
+}, chooseTools = async (ctx, available, preference) => {
+  let state = initialSelection(ctx, available, preference), { items, selected } = state, { all } = state, initialIndex = 0;
+  while (!0) {
+    let checkedIndices = [
+      ...all ? [0] : [],
+      ...items.flatMap((item, index) => selected.has(item.id) ? [index + 1] : [])
+    ], choice = await ctx.ui.select("Forge MCP providers", [
+      { description: "Enable all current and future providers", label: All },
+      ...items.map((item) => ({
+        description: item.id.includes("_") ? "Available only in All mode" : void 0,
+        label: providerLabel(item)
+      })),
+      { description: "Save the selection; reconnect Forge MCP to apply it", label: Save }
+    ], {
+      checkedIndices,
+      helpText: "Select a provider to toggle it, then select Save. Escape cancels.",
+      initialIndex,
+      markableCount: items.length + 1,
+      selectionMarker: "checkbox"
+    });
+    if (choice === void 0)
+      return;
+    if (choice === Save)
+      return all || items.length > 0 && selected.size === items.length ? !0 : [...selected].toSorted();
+    if (choice === All) {
+      if (all = !all, selected.clear(), all)
+        for (let item of items)
+          selected.add(item.id);
+      initialIndex = 0;
+      continue;
+    }
+    let index = items.findIndex((item) => providerLabel(item) === choice);
+    if (index === -1)
+      throw Error("Forge provider selection is invalid.");
+    let { id } = items[index];
+    if (initialIndex = index + 1, all) {
+      if (all = !1, selectSupportedProviders(ctx, items, selected), id.includes("_"))
+        continue;
+    }
+    if (id.includes("_"))
+      ctx.ui.notify("This provider is only supported in All mode.", "warning");
+    else if (selected.has(id))
+      selected.delete(id);
+    else
+      selected.add(id);
+  }
+}, registerToolsCommand = (pi) => {
+  pi.registerCommand("forge:tools", {
+    description: "Choose which Forge MCP providers are available",
+    handler: async (_args, ctx) => {
+      if (!ctx.hasUI) {
+        ctx.ui.notify("Run /forge:tools in an interactive session.", "error");
+        return;
+      }
+      try {
+        let [available, preference] = await Promise.all([
+          discoverToolProviders(),
+          readToolsPreference(ctx.cwd)
+        ]), value = await chooseTools(ctx, available, preference);
+        if (value === void 0)
+          return;
+        await saveToolsPreference(ctx.cwd, value);
+        let effective = await readToolsPreference(ctx.cwd);
+        ctx.ui.notify(JSON.stringify(effective) === JSON.stringify(value) ? "Forge provider selection saved. Run /mcp reload to apply it." : "Selection saved, but a project override takes precedence. Run /mcp reload after updating it.", "info");
+      } catch (error) {
+        ctx.ui.notify(error instanceof ProviderCatalogError ? error.message : "Could not configure Forge providers. Check Forge Desktop and OMP plugin settings.", "error");
+      }
+    }
+  });
+};
+
 // src/index.ts
 async function forgePlugin(pi) {
-  registerForgeMcp(pi, import.meta.url), registerBilling(pi);
+  registerForgeMcp(pi, import.meta.url), registerBilling(pi), registerToolsCommand(pi);
   let [refreshDesktop, refreshRouter] = await Promise.all([
     forgeDesktopPlugin(pi),
     router_default(pi)

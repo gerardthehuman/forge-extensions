@@ -9,6 +9,7 @@ import type { MCPServer } from "@oh-my-pi/pi-coding-agent/capability/mcp";
 import { findScopedSettings } from "@oh-my-pi/pi-coding-agent/config/settings";
 
 import { McpEndpointSchema } from "./mcp-config.ts";
+import { applyToolsPreference, readToolsPreference } from "./tools-config.ts";
 
 export const registerForgeMcp = (pi: ExtensionAPI, entrypoint: string): void => {
   const source = fileURLToPath(entrypoint);
@@ -50,6 +51,7 @@ export const registerForgeMcp = (pi: ExtensionAPI, entrypoint: string): void => 
       try {
         const forge = await useForgeClient();
         const { url, headers } = McpEndpointSchema.parse(await forge.mcp.servers());
+        applyToolsPreference(url, await readToolsPreference(ctx.cwd));
         // A non-empty CSV with no entries suppresses Forge MCP prompt commands.
         url.searchParams.set("skills", ",");
 
@@ -69,7 +71,9 @@ export const registerForgeMcp = (pi: ExtensionAPI, entrypoint: string): void => 
         // SDK and HTTP errors can contain credentials or response bodies.
         return {
           items: [],
-          warnings: ["Forge MCP is unavailable. Start Forge Desktop, then restart OMP."],
+          warnings: [
+            "Forge MCP is unavailable or its provider selection is invalid. Check Forge Desktop and /forge:tools.",
+          ],
         };
       }
     },
